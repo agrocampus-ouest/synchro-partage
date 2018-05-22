@@ -1,98 +1,16 @@
 #!/usr/bin/python3
 
-import json , lmdb , time , ldap3 , sys , os.path
+import sys , os.path
 from aolpsync import *
+
 
 #-------------------------------------------------------------------------------
 
-class Processor:
 
-    def load_cos( self ):
-        """
-        Charge les classes de services depuis le serveur BSS et construit un
-        dictionnaire associant les noms de classes à leurs identifiants.
-        """
-        import lib_Partage_BSS.services.COSService as bsssc
-        import lib_Partage_BSS.exceptions as bsse
-        try:
-            coses = bsssc.getAllCOS( self.cfg.get( 'bss' , 'domain' ) )
-        except ( bsse.NameException , bsse.DomainException ,
-                bsse.ServiceException ) as error:
-            Logging( 'bss' ).error( "Erreur lecture CoS: {}".format(
-                    repr( error ) ) )
-            raise FatalError( 'Impossible de lire la liste des CoS' )
-        self.coses = { c.cn : c.id for c in coses }
-        Logging( 'bss' ).debug( 'Classes de service: {}'.format(
-                ', '.join([ '{} (ID {})'.format( str( c.cn ) , str( c.id ) )
-                        for c in coses ]) ) )
-
-    def load_from_ldap( self ):
-        """
-        Charge les données depuis le serveur LDAP. Les comptes et groupes
-        seront chargés, puis la liste des aliases sera établie. Les comptes ne
-        devant pas être synchronisés car ils correspondent à un alias seront
-        ôtés de la liste. Enfin, si le domaine BSS et le domaine mail sont
-        différents (parce que l'on est sur le serveur de test, par exemple),
-        corrige toutes les adresses.
-        """
-        ldap_data = LDAPData( self.cfg )
-        aliases = AliasesMap( self.cfg , ldap_data.accounts )
-        ldap_data.remove_alias_accounts( )
-        ldap_data.set_aliases( aliases )
-        ldap_data.fix_mail_domain( self.cfg )
-        ldap_data.clear_empty_sets( )
-
-        # Sélection des comptes
-        try:
-            match_rule = Rule( 'account selection' ,
-                    self.cfg.get( 'ldap' , 'match-rule' , '(true)' ) )
-        except RuleError as e:
-            Logging( 'cfg' ).critical( str( e ) )
-            raise FatalError( 'Erreur dans la règle de sélection des comptes' )
-        self.ldap_accounts = {}
-        for eppn in ldap_data.accounts:
-            a = ldap_data.accounts[ eppn ]
-            if match_rule.check( a ):
-                self.ldap_accounts[ eppn ] = a
-            else:
-                Logging( 'ldap' ).debug( 'Compte {} éliminé via règle'.format(
-                        eppn ) )
-
-
-    def load_db_accounts( self , txn ):
-        """
-        Lit l'intégralité des comptes depuis la base de données.
-
-        :param txn: la transaction LightningDB
-        :return: la liste des comptes lus depuis la base
-        """
-        def d_( x ): return x.decode( 'utf-8' )
-        def na_( x ): return SyncAccount( self.cfg ).from_json( d_( x ) )
-        with txn.cursor( ) as cursor:
-            acc = { d_( a[ 0 ] ) : na_( a[ 1 ] ) for a in cursor }
-        for x in acc.values( ): x.clear_empty_sets( )
-        Logging( 'db' ).info( '{} comptes chargés depuis la BDD'.format(
-                len( acc ) ) )
-        self.db_accounts = acc
-
-    def save_account( self , account ):
-        """
-        Sauvegarde les informations d'un compte dans la base de données. Si le
-        drapeau de simulation est présent dans la configuration, l'opération ne
-        sera pas réellement effectuée.
-
-        :param SyncAccount account: le compte à sauvegarder
-        """
-        sim = self.cfg.has_flag( 'bss' , 'simulate' )
-        mode = 'simulée ' if sim else ''
-        Logging( 'db' ).debug( 'Sauvegarde {}du compte {} (mail {})'.format(
-                mode , account.eppn, account.mail ) )
-        if sim: return
-
-        db_key = account.eppn.encode( 'utf-8' )
-        account.clear_empty_sets( )
-        with self.db.begin( write = True ) as txn:
-            txn.put( db_key , account.to_json( ).encode( 'utf-8' ) )
+class Synchronizer( ProcessSkeleton ):
+    """
+    Cette classe implémente le script de synchronisation principal.
+    """
 
     def add_aliases( self , account , aliases ):
         """
@@ -339,7 +257,7 @@ class Processor:
         dba.mail = del_addr
         self.save_account( dba )
 
-    def process_accounts( self ):
+    def process( self ):
         """
         Effectue les opérations sur les comptes, en synchronisant la base de
         données au fur et à mesure.
@@ -381,29 +299,15 @@ class Processor:
         for eppn in deleted:
             self.pre_delete( eppn )
 
-    def __init__( self ):
-        self.cfg = Config( )
-        self.cfg.bss_connection( )
-        self.load_cos( )
-        self.cfg.check_coses( self.coses )
-        self.load_from_ldap( )
-        BSSAction.SIMULATE = self.cfg.has_flag( 'bss' , 'simulate' )
-        if BSSAction.SIMULATE:
-            Logging( ).warn( 'Mode simulation activé' )
-        with self.cfg.lmdb_env( ) as db:
-            self.db = db
-            with db.begin( write = False ) as txn:
-                self.load_db_accounts( txn )
-            self.process_accounts( )
-
 
 #-------------------------------------------------------------------------------
+
 
 own_path = os.path.dirname( os.path.realpath( __file__ ) )
 Logging.FILE_NAME = os.path.join( own_path , 'partage-sync-logging.ini' )
 Config.FILE_NAME = os.path.join( own_path , 'partage-sync.ini' )
 try:
-    Processor( )
+    Synchronizer( )
 except FatalError as e:
     Logging( ).critical( str( e ) )
     sys.exit( 1 )
