@@ -1,4 +1,4 @@
-from .configuration import Config
+from .configuration import Config , CfgOverride
 from .data import SyncAccount
 from .logging import Logging
 from .data import LDAPData , AliasesMap
@@ -19,25 +19,51 @@ class ProcessSkeleton:
 
         Par défaut:
 
-        * la description est lue grâce à la méthode cli_description()
+        * la description est lue grâce à la méthode cli_description();
 
-        * un éventuel épilogue est lu grâce à la méthode cli_epilog()
+        * un éventuel épilogue est lu grâce à la méthode cli_epilog();
 
         * un argument '-C' permettant de changer le répertoire de configuration
-        est ajouté.
+        est ajouté;
+
+        * un argument '-S' permettant d'écraser la valeur d'une option de
+        configuration est ajouté;
+
+        * un argument '-D' permettant de définir un drapeau de configuration est
+        ajouté;
+
+        * un argument '-U' permettant de supprimer un drapeau ou une option de
+        configuration est ajouté.
+
+        D'autres arguments peuvent être ajoutés en surchargeant la méthode
+        cli_register_arguments().
         """
         import argparse , os.path , sys
         parser = argparse.ArgumentParser(
                 description = self.cli_description( ) ,
                 epilog = self.cli_epilog( ) )
 
+        cfg_group = parser.add_argument_group( 'Configuration' )
         own_path = os.path.dirname( os.path.realpath( sys.argv[ 0 ] ) )
-        parser.add_argument( '-C' , '--config-dir' ,
+        cfg_group.add_argument( '-C' , '--config-dir' ,
                 action = 'store' , nargs = 1 , type = str ,
                 help = 'Répertoire des fichiers de configuration' ,
+                metavar = ( 'directory' , ) ,
                 default = own_path )
-        self.cli_register_arguments( parser )
+        cfg_group.add_argument( '-S' , '--cfg-set' ,
+                action = 'append' , nargs = 3 ,
+                metavar = ( 'section' , 'name' , 'value' ) ,
+                help = 'Écrase la valeur d\'une option de configuration.' )
+        cfg_group.add_argument( '-D' , '--cfg-define' ,
+                action = 'append' , nargs = 2 ,
+                metavar = ( 'section' , 'name' ) ,
+                help = 'Définit un drapeau de configuration.' )
+        cfg_group.add_argument( '-U' , '--cfg-undefine' ,
+                action = 'append' , nargs = 2 ,
+                metavar = ( 'section' , 'name' ) ,
+                help = 'Supprime une option ou un drapeau de configuration.' )
 
+        self.cli_register_arguments( parser )
         self.arguments = parser.parse_args( )
 
     def cli_description( self ):
@@ -66,6 +92,36 @@ class ProcessSkeleton:
         :param argparse.ArgumentParser parser: le lecteur de ligne de commande
         """
         pass
+
+    def get_cfg_overrides( self ):
+        """
+        Génère une liste d'objets représentant des surcharges de configuration à
+        partir des arguments -S/-U/-D du programme.
+
+        :raises FatalError: si plusieurs arguments font référence à la même \
+                option
+
+        :return: la liste des surcharges à appliquer
+        """
+        col = []
+        if self.arguments.cfg_set:
+            for co_set in self.arguments.cfg_set:
+                col.append( CfgOverride( *co_set ) )
+        if self.arguments.cfg_define:
+            for co_def in self.arguments.cfg_define:
+                col.append( CfgOverride( *co_def ) )
+        if self.arguments.cfg_undefine:
+            for co_undef in self.arguments.cfg_undefine:
+                col.append( CfgOverride( *co_undef , undef = True ) )
+        cod = {}
+        for co in col:
+            if co.key in cod:
+                raise FatalError(
+                        ( 'Plusieurs options affectent la variable de '
+                        + 'configuration "{}" de la section "{}".' ).format(
+                            co.name , co.section ) )
+            cod[ co.key ] = co
+        return cod.values( )
 
     def load_cos( self ):
         """
@@ -208,12 +264,13 @@ class ProcessSkeleton:
         """
         self.parse_arguments( )
 
+        # Initialisation des chemins de configuration
         from os.path import join as opjoin
         cd = self.arguments.config_dir
         Logging.FILE_NAME = opjoin( cd , 'partage-sync-logging.ini' )
         Config.FILE_NAME = opjoin( cd , 'partage-sync.ini' )
 
-        self.cfg = Config( )
+        self.cfg = Config( self.get_cfg_overrides( ) )
         self.preinit( )
 
         if require_bss:

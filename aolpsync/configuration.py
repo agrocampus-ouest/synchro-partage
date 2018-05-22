@@ -3,6 +3,78 @@ from .data import SyncAccount
 from .rules import Rule , RuleError
 from .utils import FatalError
 
+
+#-------------------------------------------------------------------------------
+
+
+class CfgOverride:
+    """
+    Classe utilisée pour représenter les options de ligne de commande permettant
+    d'écraser des éléments de la configuration.
+    """
+
+    def __init__( self , section , name , value = None , undef = False ):
+        """
+        Initialise cette entrée. Toutes les entrées d'écrasement possèdent une
+        section et un nom. Les entrées de modification ont en plus une valeur,
+        et les entrées de suppression un drapeau de suppression.
+
+        :param str section: le nom de la section
+        :param str name: le nom de l'option
+        :param str value: la valeur de l'option; paramètre ne devant être \
+                présent que s'il s'agit d'un remplacement de valeur
+        :param bool undef: doit-on supprimer l'option?
+        """
+        self.section = section
+        self.name = name
+        self.value = value
+        self.undef = undef
+
+    @property
+    def key( self ):
+        """
+        Génère une clé de dictionnaire pour cette entrée
+
+        :return: la clé sous la forme d'un tuple (section,nom)
+        """
+        return ( self.section , self.name )
+
+    @property
+    def action( self ):
+        """
+        Détermine le type d'action représentée en vérifiant la valeur et le
+        drapeau de suppression.
+
+        :return: le type d'action: 's' pour remplacement, 'u' pour suppression \
+                ou 'd' pour définition
+        """
+        if self.value is not None:
+            return 's'
+        return 'u' if self.undef else 'd'
+
+    def apply( self , cfg ):
+        """
+        Applique l'action à une configuration.
+
+        :param configparser.ConfigParser cfg: l'instance de configuration à \
+                mettre à jour
+        """
+        a = self.action
+        if a == 'u':
+            if cfg.has_section( self.section ):
+                cfg.remove_option( self.section , self.name )
+            return
+        if not cfg.has_section( self.section ):
+            cfg.add_section( self.section )
+        if a == 'd' and cfg.has_option( self.section , self.name ):
+            return
+        cfg.set( self.section , self.name ,
+                self.value if self.action == 's' else '' )
+
+
+#-------------------------------------------------------------------------------
+
+
 class Config:
     """
     Cette classe permet de charger, de vérifier et d'utiliser la configuration
@@ -13,26 +85,25 @@ class Config:
     # programme afin d'utiliser le chemin du script.
     FILE_NAME = 'partage-sync.ini'
 
-    def __init__( self , fname = None ):
+    def __init__( self , overrides = () ):
         """
         Charge le fichier de configuration et vérifie que toutes les entrées
         requises sont présentes.
 
-        :param str fname: le nom du fichier de configuration
         :raises FatalError: le fichier n'existe pas, ou la configuration est \
                 incomplète
         """
-        if fname is None:
-            fname = Config.FILE_NAME
-
         from configparser import ConfigParser
         config = ConfigParser( allow_no_value = True )
         try:
-            config.read_file( open( fname ) )
+            config.read_file( open( Config.FILE_NAME ) )
         except FileNotFoundError:
             raise FatalError(
-                    'Fichier de configuration "{}" non trouvé'.format( fname )
+                    'Fichier de configuration "{}" non trouvé'.format(
+                        Config.FILE_NAME )
                 )
+        for co in overrides:
+            co.apply( config )
         param_checks = (
             ( 'ldap' , (
                 'host' , 'user' , 'pass' ,
