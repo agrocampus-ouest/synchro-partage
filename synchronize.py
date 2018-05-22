@@ -12,6 +12,10 @@ class Synchronizer( ProcessSkeleton ):
     Cette classe implémente le script de synchronisation principal.
     """
 
+    def cli_description( self ):
+        return '''Éffectue la synchronisation depuis l'annuaire LDAP vers le
+                  serveur de Partage.'''
+
     def add_aliases( self , account , aliases ):
         """
         Enregistre de nouveaux aliases pour un compte Partage, en synchronisant

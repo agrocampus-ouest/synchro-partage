@@ -12,6 +12,61 @@ class ProcessSkeleton:
     certain nombre de méthodes communes.
     """
 
+    def parse_arguments( self ):
+        """
+        Configure le lecteur d'arguments puis l'exécute. Les valeurs lues seront
+        stockées dans self.arguments.
+
+        Par défaut:
+
+        * la description est lue grâce à la méthode cli_description()
+
+        * un éventuel épilogue est lu grâce à la méthode cli_epilog()
+
+        * un argument '-C' permettant de changer le répertoire de configuration
+        est ajouté.
+        """
+        import argparse , os.path , sys
+        parser = argparse.ArgumentParser(
+                description = self.cli_description( ) ,
+                epilog = self.cli_epilog( ) )
+
+        own_path = os.path.dirname( os.path.realpath( sys.argv[ 0 ] ) )
+        parser.add_argument( '-C' , '--config-dir' ,
+                action = 'store' , nargs = 1 , type = str ,
+                help = 'Répertoire des fichiers de configuration' ,
+                default = own_path )
+        self.cli_register_arguments( parser )
+
+        self.arguments = parser.parse_args( )
+
+    def cli_description( self ):
+        """
+        Cette méthode doit être surchargée afin de renvoyer la description
+        correspondant à l'outil implémenté par cette classe.
+
+        :return: le texte de la description
+        """
+        raise NotImplementedError
+
+    def cli_epilog( self ):
+        """
+        Cette méthode peut être surchargée afin de renvoyer un épilogue à
+        afficher lorsque l'on demande l'aide en ligne de commande.
+
+        :return: le texte de l'épilogue
+        """
+        return None
+
+    def cli_register_arguments( self , parser ):
+        """
+        Cette méthode peut être surchargée afin d'ajouter des arguments au
+        lecteur de ligne de commande.
+
+        :param argparse.ArgumentParser parser: le lecteur de ligne de commande
+        """
+        pass
+
     def load_cos( self ):
         """
         Charge les classes de services depuis le serveur BSS et construit un
@@ -151,6 +206,13 @@ class ProcessSkeleton:
         :param bool require_ldap: les informations du LDAP doivent-elle être \
                 chargées?
         """
+        self.parse_arguments( )
+
+        from os.path import join as opjoin
+        cd = self.arguments.config_dir
+        Logging.FILE_NAME = opjoin( cd , 'partage-sync-logging.ini' )
+        Config.FILE_NAME = opjoin( cd , 'partage-sync.ini' )
+
         self.cfg = Config( )
         self.preinit( )
 

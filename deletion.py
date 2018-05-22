@@ -13,15 +13,20 @@ class Deleter( ProcessSkeleton ):
     marqués comme pré-supprimés.
     """
 
-    def __init__( self , interactive ):
-        """
-        :param bool interactive: indique que le script devra être lancé en \
-                mode intéractif
-        """
-        self.interactive = interactive
+    def __init__( self ):
         ProcessSkeleton.__init__( self ,
                 require_ldap = False ,
                 require_cos = False )
+
+    def cli_description( self ):
+        return '''Supprime les comptes ayant été pré-supprimés il y a 
+                  suffisamment longtemps.''';
+
+    def cli_register_arguments( self , parser ):
+        parser.add_argument( '-A' , '--auto' ,
+                action = 'store_true' ,
+                help = '''Effectue les suppressions automatiquement, sans
+                    intéraction avec l'utilisateur.''' )
 
     def get_deletion_threshold( self ):
         """
@@ -108,7 +113,7 @@ class Deleter( ProcessSkeleton ):
         intéractif), puis effectue les suppressions.
         """
         self.identify_targets( )
-        if not self.interactive:
+        if self.arguments.auto:
             if not self.to_delete:
                 Logging( ).info( 'Aucun compte à supprimer' )
                 return
@@ -122,12 +127,8 @@ class Deleter( ProcessSkeleton ):
 #-------------------------------------------------------------------------------
 
 
-own_path = os.path.dirname( os.path.realpath( __file__ ) )
-Logging.FILE_NAME = os.path.join( own_path , 'partage-sync-logging.ini' )
-Config.FILE_NAME = os.path.join( own_path , 'partage-sync.ini' )
 try:
-    # FIXME: interactive devrait être lu depuis la CL
-    Deleter( interactive = False )
+    Deleter( )
 except FatalError as e:
     Logging( ).critical( str( e ) )
     sys.exit( 1 )
