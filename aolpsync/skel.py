@@ -98,6 +98,20 @@ class ProcessSkeleton:
         with self.db.begin( write = True ) as txn:
             txn.put( db_key , account.to_json( ).encode( 'utf-8' ) )
 
+    def remove_account( self , account ):
+        """
+        Supprime l'enregistrement d'un compte de la base de données.
+
+        :param SyncAccount account: le compte à supprimer
+        """
+        sim = self.cfg.has_flag( 'bss' , 'simulate' )
+        mode = 'simulée ' if sim else ''
+        Logging( 'db' ).debug( 'Suppression {}du compte {} (mail {})'.format(
+                mode , account.eppn, account.mail ) )
+        if not sim:
+            with self.db.begin( write = True ) as txn:
+                txn.pop( account.eppn.encode( 'utf-8' ) )
+
     def preinit( self ):
         """
         Cette méthode peut être surchargée pour implémenter toute action

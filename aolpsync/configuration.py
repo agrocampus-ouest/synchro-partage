@@ -43,7 +43,8 @@ class Config:
                 'path' ,
             ) ) ,
             ( 'bss' , (
-                'domain' , 'token' , 'default-cos'
+                'domain' , 'token' , 'default-cos' ,
+                'deletion-threshold'
             ) ) ,
             ( 'ldap-people-classes' , ( ) ) ,
         )

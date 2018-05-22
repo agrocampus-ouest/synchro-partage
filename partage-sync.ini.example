@@ -133,6 +133,10 @@ token=c0ffee15600da150deadbeef15b4d34567892345678912345678912345678900
 # Nom de la classe de service par défaut (OBLIGATOIRE)
 default-cos=etu_sa_agrocampus-ouest
 
+# Temps après lequel un compte pré-supprimé sera effectivement supprimé, exprimé
+# en jours. (OBLIGATOIRE)
+deletion-threshold=160
+
 # Règles supplémentaires pour l'assignement de classe de service
 # Chaque règle doit porter le nom d'une classe de service. La syntaxe à utiliser
 # pour la règle elle-même est décrite en en-tête de ce fichier.
@@ -158,3 +162,5 @@ default-cos=etu_sa_agrocampus-ouest
 [bss-extra-attributes]
 	site=l
 
+
+# vim: syntax=cfg
