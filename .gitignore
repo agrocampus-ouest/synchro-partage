@@ -1,3 +1,5 @@
 .vim.local/data
 .vim.local/signature
 partage-sync.ini
+*.pyc
+__pycache__
