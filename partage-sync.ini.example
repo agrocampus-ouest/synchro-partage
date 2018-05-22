@@ -1,0 +1,160 @@
+#==============================================================================#
+#                                                                              #
+#    CONFIGURATION DES SCRIPTS DE SYNCHRONISATION LDAP <-> RENATER PARTAGE     #
+#                                                                              #
+#==============================================================================#
+
+# Un certain nombre de paramètres utilise un système de règles avec une syntaxe
+# particulière.
+#
+# La règle est composée d'opérateurs de test. Chaque opérateur a la forme d'une
+# liste entre parenthèses; cette liste commence par le nom de l'opérateur.
+#
+# Un nom ou une valeur commençant par un caractère alphabétique et ne contenant
+# que des caractères alphanumériques peut être utilisé directement. Pour les
+# autres valeurs, des doubles apostrophes doivent être utilisées afin de
+# délimiter la valeur.
+#
+# Les opérateurs suivants sont disponibles:
+#
+#   Tests sur valeurs:
+#
+#	(eq nom valeur)      	Vérifie que l'attribut "nom" a la valeur
+#					indiquée
+#	(ne nom valeur)	     	Vérifie que l'attribut "nom" n'a pas cette
+#					valeur
+#	(empty nom)          	Vérifie que l'attribut "nom" n'a pas de valeur
+#	(contains nom valeur)	Vérifie que l'attribut "nom" contient la valeur
+#					spécifiée. Si l'attribut est une simple
+#					chaîne, cet opérateur est équivallent à
+#					l'opérateur 'eq' ci-dessus
+#
+#   Opérateurs logiques:
+#
+#	(and (règle) (règle) ...)	Toutes les règles sont vraies
+#	(or (règle) (règle) ...)	Au moins une règle est vraie
+#	(xor (règle) (règle) ...)	Une seule règle est vraie
+#	(not (règle))			La règle est fausse
+#
+#   Valeurs constantes. Peuvent être utilisées pour déboguer par exemple.
+#
+#	(true)			Vrai
+#	(false)			Faux
+#
+
+
+################################################################################
+# Configuration de l'annuaire LDAP
+################################################################################
+
+[ldap]
+
+# Nom du serveur (OBLIGATOIRE)
+host=ldap2.agrocampus-ouest.fr
+
+# Port. Par défaut, 636.
+#port=636
+
+# Utiliser SSL - 1 (défaut) ou 0
+#ssl=1
+
+# Utilisateur (OBLIGATOIRE)
+# Cet utilisateur doit être en mesure de lire les mots de passe hashés
+# des autres utilisateurs
+user=cn=admin,dc=agrocampus-ouest,dc=fr
+
+# Mot de passe (OBLIGATOIRE)
+#pass=...
+
+# Chemin de la liste des utilisateurs (OBLIGATOIRE)
+people-dn=ou=people,dc=agrocampus-ouest,dc=fr
+
+# Chemin de la liste des groupes (OBLIGATOIRE)
+groups-dn=ou=groups,dc=agrocampus-ouest,dc=fr
+
+# Domaine de courier électronique (OBLIGATOIRE)
+mail-domain=agrocampus-ouest.fr
+
+# Domaine à utiliser pour les eduPersonPrincipalName (OBLIGATOIRE)
+eppn-domain=agrocampus-ouest.fr
+
+# Limite sur les résultats LDAP. Utilisé pour déboguer.
+#limit=40
+
+# Sélection des comptes à synchroniser. Syntaxe de la règle décrite plus haut.
+# Si la règle est absente tous les comptes seront acceptés.
+#match-rule=(contains groups dsi)
+
+# Classes des enregistrements utilisateurs (OBLIGATOIRE)
+# La liste des classes LDAP utilisées pour accéder aux enregistrements des
+# utilisateurs; ces classes doivent exister sur le serveur.
+[ldap-people-classes]
+	agrocampusPerson
+	supannPerson
+	eduPerson
+
+# Classes des enregistrements groupes
+# La liste des classes LDAP utilisées pour accéder aux enregistrements des
+# utilisateurs; ces classes doivent exister sur le serveur.
+# Si cette section n'existe pas, la classe posixGroup sera utilisée.
+#[ldap-groups-classes]
+#	posixGroup
+
+
+################################################################################
+# Configuration de la base de données
+################################################################################
+
+[db]
+
+# Chemin de la base (OBLIGATOIRE)
+path=/var/lib/partage-sync
+
+# Taille maximale en mémoire. Par défaut 200Mo.
+#map-limit=209715200
+
+
+################################################################################
+# Configuration de l'API BSS
+################################################################################
+
+[bss]
+
+# Mode simulation (n'effectue aucune modification chez Renater, et ne
+# synchronise pas la base locale).
+#simulate
+
+# Nom de domaine BSS (OBLIGATOIRE)
+domain=test-partage.agrocampus-ouest.fr
+
+# Jeton d'authentification (OBLIGATOIRE)
+token=c0ffee15600da150deadbeef15b4d34567892345678912345678912345678900
+
+# Nom de la classe de service par défaut (OBLIGATOIRE)
+default-cos=etu_sa_agrocampus-ouest
+
+# Règles supplémentaires pour l'assignement de classe de service
+# Chaque règle doit porter le nom d'une classe de service. La syntaxe à utiliser
+# pour la règle elle-même est décrite en en-tête de ce fichier.
+[cos-rules]
+	staff_xl_agrocampus-ouest=(eq affiliation member)
+
+
+################################################################################
+# Configuration de la synchronisation
+################################################################################
+
+# Attributs supplémentaires: liste des attributs
+[extra-attributes]
+	site
+	affiliation
+
+# Attributs supplémentaires: correspondance attribut local <-> attribut LDAP
+[ldap-extra-attributes]
+	affiliation=eduPersonPrimaryAffiliation
+	site=agrocampusSite
+
+# Attributs supplémentaires: correspondance attribut local <-> attribut BSS
+[bss-extra-attributes]
+	site=l
+

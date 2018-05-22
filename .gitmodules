@@ -1,0 +1,3 @@
+[submodule "libPythonBssApi"]
+	path = libPythonBssApi
+	url = git@github.com:emmanuel-benoit/libPythonBssApi.git
