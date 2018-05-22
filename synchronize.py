@@ -248,6 +248,7 @@ class Synchronizer( ProcessSkeleton ):
             return
 
         # Puis on le renomme
+        import time
         dba.markedForDeletion = int( time.time( ) )
         del_addr = 'del-{}-{}'.format( dba.markedForDeletion , dba.mail )
         if not BSSAction( 'renameAccount' , dba.mail , del_addr ):
