@@ -732,7 +732,8 @@ class LDAPData:
                 ldap_dom , bss_dom ) )
         for account in self.accounts.values( ):
             account.mail = fix_it_( account.mail )
-            account.aliases = set([ fix_it_( a ) for a in account.aliases ])
+            if account.aliases is not None:
+                account.aliases = set([ fix_it_( a ) for a in account.aliases ])
 
     def clear_empty_sets( self ):
         """
