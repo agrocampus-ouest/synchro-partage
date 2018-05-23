@@ -63,6 +63,19 @@ def json_dump( data ):
 #-------------------------------------------------------------------------------
 
 
+class BSSQuery:
+    """
+    Une classe qui peut être passée comme paramètre d'action à BSSAction afin
+    de distinguer les demandes d'informations des actions de modification.
+    """
+    def __init__( self , action ):
+        self.action = action
+    def __str__( self ):
+        return self.action
+    def __bool__( self ):
+        return False
+
+
 class BSSAction:
     """
     Encapsulation d'un appel au service BSS permettant de réaliser facilement
@@ -78,19 +91,23 @@ class BSSAction:
         Effectue un appel à l'API, en initialisant les champs appropriés. Tous
         les paramètres supplémentaires seront passés à la librairie.
 
-        :param str action: le nom de l'appel à effectuer
+        :param action: le nom de l'appel à effectuer, ou un objet de type \
+                BSSQuery encapsulant ce nom
         """
         from lib_Partage_BSS.services import AccountService
         import lib_Partage_BSS.exceptions as bsse
         self.ok_ = False
+        is_action = bool( action )
+        action = str( action )
+        simulate = BSSAction.SIMULATE and is_action
 
-        mode = 'simulé ' if BSSAction.SIMULATE else ''
+        mode = 'simulé ' if simulate else ''
         from .logging import Logging
         Logging( 'bss' ).debug( 'Appel ' + mode + action
                 + ': arguments ' + repr( args )
                 + ' / par nom ' + repr( kwargs ) )
 
-        if BSSAction.SIMULATE:
+        if simulate:
             self.data_ = None
             self.ok_ = True
             return
