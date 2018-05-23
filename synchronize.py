@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 
-import sys , os.path
 from aolpsync import *
 
 
@@ -308,11 +307,9 @@ class Synchronizer( ProcessSkeleton ):
 #-------------------------------------------------------------------------------
 
 
-own_path = os.path.dirname( os.path.realpath( __file__ ) )
-Logging.FILE_NAME = os.path.join( own_path , 'partage-sync-logging.ini' )
-Config.FILE_NAME = os.path.join( own_path , 'partage-sync.ini' )
 try:
     Synchronizer( )
 except FatalError as e:
+    import sys
     Logging( ).critical( str( e ) )
     sys.exit( 1 )

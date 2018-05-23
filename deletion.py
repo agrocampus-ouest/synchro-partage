@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 
-import sys , os.path
 from aolpsync import *
 
 
@@ -130,5 +129,6 @@ class Deleter( ProcessSkeleton ):
 try:
     Deleter( )
 except FatalError as e:
+    import sys
     Logging( ).critical( str( e ) )
     sys.exit( 1 )
