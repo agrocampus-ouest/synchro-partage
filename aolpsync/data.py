@@ -129,7 +129,7 @@ class SyncAccount:
 
         # Attributs par défaut
         attrs = set([
-            'eppn' , 'surname' , 'givenName' ,
+            'uid' , 'eppn' , 'surname' , 'givenName' ,
             'displayName' , 'mail' , 'passwordHash' , 'groups' ,
             'ldapMail' , 'markedForDeletion' , 'aliases' , 'cos'
         ])
@@ -162,6 +162,7 @@ class SyncAccount:
         # On génère la liste des attributs par défaut
         LA = LDAPAttr
         ldap_attrs = [
+            LA( 'uid' ) ,
             LA( 'eppn' , 'eduPersonPrincipalName' ,
                 gen = lambda e : "{}@{}".format( str( e.uid ) , eppn_dom ) ) ,
             LA( 'mail' , '' ,
