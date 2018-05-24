@@ -604,8 +604,9 @@ class LDAPData:
                     # Redirection?
                     if not a.ldapMail.endswith( mail_domain ):
                         Logging( 'ldap' ).info( (
-                                'Compte LDAP {}: redirection vers {} ignorée'
-                            ).format( str( entry.uid ) , a.mail ) )
+                                'Compte LDAP {}: redirection depuis {} vers '
+                                + '{} ignorée'
+                            ).format( str( entry.uid ) , a.mail , a.ldapMail ) )
                         continue
 
                     accounts[ a.eppn ] = a
@@ -662,6 +663,10 @@ class LDAPData:
                                     eppn ) )
 
             def set_account_cos_( ):
+                """
+                Applique les règles d'attribution de classes de service aux
+                comptes.
+                """
                 def_cos = cfg.get( 'bss' , 'default-cos' )
                 cos_rules = cfg.parse_cos_rules( )
                 for a in self.accounts.values( ):

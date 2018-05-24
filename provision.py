@@ -13,39 +13,6 @@ class Provisioner( ProcessSkeleton ):
     intermédiaire.
     """
 
-    def get_ldif_mapping( self ):
-        domain = self.cfg.get( 'ldap' , 'eppn-domain' ).split( '.' )
-        dn_root = 'ou={},dc={}'.format( self.arguments.organizational_unit ,
-                ',dc='.join( domain ) )
-        dn_fmt = 'uid={},' + dn_root
-
-        from collections import OrderedDict
-        def pw_decoder_( entry ):
-            try:
-                return entry.passwordHash.decode( 'ascii' )
-            except UnicodeDecodeError:
-                raise FatalError( ( 'Le mot de passe de {} contient des '
-                        + 'caractères non-ASCII' ).format( e.eppn ) )
-
-        mapping = OrderedDict((
-            ( 'dn' , lambda e : dn_fmt.format( e.uid ) ) ,
-            ( 'zimbraMailAlias' , lambda e : ( None if e.aliases is None
-                                                  else list( e.aliases ) ) ) ,
-            ( 'userPassword' , pw_decoder_ ) ,
-            ( 'description' , lambda e : e.cos ) ,
-            ( 'Id_eppn' , lambda e : e.eppn ) ,
-        ))
-
-        # Autres mappings
-        def mk_lambda_( attr ):
-            return lambda e : getattr( e , attr )
-        for bss_attr in SyncAccount.BSS:
-            if bss_attr in mapping or bss_attr == 'carLicense':
-                continue
-            mapping[ bss_attr ] = mk_lambda_( SyncAccount.BSS[ bss_attr ] )
-
-        return mapping
-
     def cli_description( self ):
         return '''Génère le fichier LDIF de provisioning ainsi qu'un fichier
                   JSON qui servira ensuite à alimenter la base de données.'''
@@ -69,26 +36,104 @@ class Provisioner( ProcessSkeleton ):
                           à générer''' )
 
     def load_redirects( self , in_file ):
+        """
+        Charge les redirections depuis un fichier CSV. Chaque ligne du fichier
+        contient deux colonnes: l'UID ou l'EPPN de l'utilisateur concerné dans
+        la première colonne, et l'adresse vers laquelle les mails doivent être
+        poussés dans la seconde colonne.
+
+        :param in_file: le fichier depuis lequel les données seront lues
+        :raises FatalError: le fichier contient des données erronnées
+        :return: un dictionnaire associant les EPPN aux adresses de redirection
+        """
         import csv
         rd_csv = csv.reader( in_file )
         ln = 0
         eppn_domain = self.cfg.get( 'ldap' , 'eppn-domain' )
         redirects = dict( )
+        had_errors = False
         for row in rd_csv:
             ln = ln + 1
             if len( row ) != 2:
                 Logging( 'prov' ).error(
                     'Liste des redirections, ligne {} invalide'.format( ln ) )
+                had_errors = True
                 continue
             ( uid_or_eppn , target ) = row
             if '@' not in uid_or_eppn:
                 uid_or_eppn = '{}@{}'.format( uid_or_eppn , eppn_domain )
             redirects[ uid_or_eppn ] = target
+        if had_errors:
+            raise FatalError( 'Erreurs dans la liste de redirections' )
         Logging( 'prov' ).debug( '{} redirection(s) chargée(s)'.format(
                 len( redirects ) ) )
         return redirects
 
+    def get_ldif_mapping( self ):
+        """
+        Génère un dictionnaire contenant les noms des champs devant être générés
+        dans le fichier LDIF de sortie associés à des fonctions qui génèreront
+        les valeurs appropriées à partir d'une entrée de compte.
+
+        :return: le dictionnaire de fonctions de mapping
+        """
+        domain = self.cfg.get( 'ldap' , 'eppn-domain' ).split( '.' )
+        dn_root = 'ou={},dc={}'.format( self.arguments.organizational_unit ,
+                ',dc='.join( domain ) )
+        dn_fmt = 'uid={},' + dn_root
+
+        def pw_decoder_( entry ):
+            """
+            Transforme l'empreinte de mot de passe d'une entrée en une chaîne
+            de caractères ASCII.
+
+            :param SyncAccount entry: le compte dont le mot de passe doit \
+                    être transformé
+            :return: l'empreinte sous forme de chaîne
+            """
+            try:
+                return entry.passwordHash.decode( 'ascii' )
+            except UnicodeDecodeError:
+                raise FatalError( ( 'Le mot de passe de {} contient des '
+                        + 'caractères non-ASCII' ).format( e.eppn ) )
+
+        def mk_lambda_( attr ):
+            """
+            Génère une fonction qui peut récupérer un attribut de compte.
+
+            :param str attr: le nom de l'attribut que la fonction lira
+            :return: la fonction de lecture
+            """
+            return lambda e : getattr( e , attr )
+
+        from collections import OrderedDict
+        mapping = OrderedDict((
+            ( 'dn' , lambda e : dn_fmt.format( e.uid ) ) ,
+            ( 'zimbraMailAlias' , lambda e : ( None if e.aliases is None
+                                                  else list( e.aliases ) ) ) ,
+            ( 'userPassword' , pw_decoder_ ) ,
+            ( 'description' , lambda e : e.cos ) ,
+            ( 'Id_eppn' , lambda e : e.eppn ) ,
+        ))
+
+        # Autres mappings
+        for bss_attr in SyncAccount.BSS:
+            if bss_attr in mapping or bss_attr == 'carLicense':
+                continue
+            mapping[ bss_attr ] = mk_lambda_( SyncAccount.BSS[ bss_attr ] )
+
+        return mapping
+
     def map_to_ldif( self , mapping , account ):
+        """
+        Transforme les informations d'un compte en un dictionnaire qui associe à
+        chaque nom de champ du LDIF à générer à une ou plusieurs valeurs.
+
+        :param mapping: le dictionnaire de transformation
+        :param SyncAccount account: le compte devant être transformé
+
+        :return: le dictionnaire de valeurs
+        """
         from collections import OrderedDict
         output = OrderedDict( )
         for field in mapping:
@@ -98,6 +143,17 @@ class Provisioner( ProcessSkeleton ):
         return output
 
     def init_ldif( self ):
+        """
+        Génère l'intégralité des données devant être écrites dans le fichier
+        LDIF, en se basant sur le mapping et en y ajoutant le champ pour les
+        redirections.
+
+        :raises FatalError: certains DN existent en plusieurs exemplaires, ou \
+                l'empreinte de mot de passe contient des caractères non-ASCII
+
+        :return: la liste des entrées; chaque entrée est un dictionnaire qui \
+                associe à chaque nom de champ la ou les valeurs correspondantes
+        """
         mapping = self.get_ldif_mapping( )
         dn = set( )
         entries = []
@@ -115,13 +171,35 @@ class Provisioner( ProcessSkeleton ):
         return entries
 
     def init_json( self ):
+        """
+        Génère les données qui seront sérialisées en JSON pour être
+        ultérieurement chargées en base.
+
+        :return: les données, sous la forme d'un dictionnaire associant aux \
+                EPPN des comptes l'enregistrement correspondant
+        """
         return {
             eppn : self.ldap_accounts[ eppn ].to_json_record( )
                 for eppn in self.ldap_accounts
         }
 
     def write_ldif( self , out , data ):
+        """
+        Écrit le fichier LDIF en se basant sur les données.
+
+        :param out: le fichier de sortie
+        :param data: la liste des entrées; chaque entrée est un dictionnaire \
+                qui associe à chaque nom de champ la ou les valeurs \
+                correspondantes
+        """
         def write_attr_( name , value ):
+            """
+            Écrit la ligne correspondant à une valeur d'un attribut dans le
+            fichier de sortie.
+
+            :param str name: le nom de l'attribut
+            :param str value: la valeur
+            """
             print( '{}: {}'.format( name , value ) , file = out )
 
         for e in data:
@@ -136,6 +214,14 @@ class Provisioner( ProcessSkeleton ):
             print( file = out )
 
     def preinit( self ):
+        """
+        La pré-initialisation de ce script lit le fichier de redirections. Cela
+        permet de sortir immédiatement en cas d'erreurs dans le fichier, sans
+        charger l'annuaire LDAP entier.
+
+        :raises FatalError: le fichier ne peut être chargé ou contient des \
+                erreurs
+        """
         if self.arguments.redirects is not None:
             # Chargement des redirections
             try:
@@ -148,6 +234,10 @@ class Provisioner( ProcessSkeleton ):
             self.redirects = { }
 
     def process( self ):
+        """
+        Génère les données LDIF et JSON puis les écrit dans leurs fichiers
+        respectifs.
+        """
         # Génère les données
         ldif_data = self.init_ldif( )
         json_data = self.init_json( )
@@ -169,6 +259,9 @@ class Provisioner( ProcessSkeleton ):
                     self.arguments.json_output , str( e ) ) )
 
     def __init__( self ):
+        """
+        Ce script ne nécessite pas de connexion à l'API BSS.
+        """
         ProcessSkeleton.__init__( self ,
                 require_bss = False ,
                 require_cos = False )
