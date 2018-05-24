@@ -68,6 +68,26 @@ class Provisioner( ProcessSkeleton ):
                 help = '''Le fichier JSON d'initialisation de la base de données
                           à générer''' )
 
+    def load_redirects( self , in_file ):
+        import csv
+        rd_csv = csv.reader( in_file )
+        ln = 0
+        eppn_domain = self.cfg.get( 'ldap' , 'eppn-domain' )
+        redirects = dict( )
+        for row in rd_csv:
+            ln = ln + 1
+            if len( row ) != 2:
+                Logging( 'prov' ).error(
+                    'Liste des redirections, ligne {} invalide'.format( ln ) )
+                continue
+            ( uid_or_eppn , target ) = row
+            if '@' not in uid_or_eppn:
+                uid_or_eppn = '{}@{}'.format( uid_or_eppn , eppn_domain )
+            redirects[ uid_or_eppn ] = target
+        Logging( 'prov' ).debug( '{} redirection(s) chargée(s)'.format(
+                len( redirects ) ) )
+        return redirects
+
     def map_to_ldif( self , mapping , account ):
         from collections import OrderedDict
         output = OrderedDict( )
@@ -81,13 +101,16 @@ class Provisioner( ProcessSkeleton ):
         mapping = self.get_ldif_mapping( )
         dn = set( )
         entries = []
-        for account in self.ldap_accounts:
-            ldif_data = self.map_to_ldif( mapping ,
-                    self.ldap_accounts[ account ] )
+        for eppn in self.ldap_accounts:
+            account = self.ldap_accounts[ eppn ]
+            ldif_data = self.map_to_ldif( mapping , account )
             if ldif_data[ 'dn' ] in dn:
                 raise FatalError(
                         'Mapping LDIF incorrect, doublon du DN {}'.format(
                                 ldif_data[ 'dn' ] ) )
+            if eppn in self.redirects:
+                ldif_data[ 'zimbraPrefMailForwardingAddress' ] = self.redirects[
+                        eppn ]
             entries.append( ldif_data )
         return entries
 
@@ -112,9 +135,19 @@ class Provisioner( ProcessSkeleton ):
                     for v in av: write_attr_( attr , v )
             print( file = out )
 
-    def process( self ):
-        # TODO: load redirects from CSV
+    def preinit( self ):
+        if self.arguments.redirects is not None:
+            # Chargement des redirections
+            try:
+                with open( self.arguments.redirects ) as csv_file:
+                    self.redirects = self.load_redirects( csv_file )
+            except IOError as e:
+                raise FatalError( "Impossible de charger '{}': {}".format(
+                        self.arguments.redirects , str( e ) ) )
+        else:
+            self.redirects = { }
 
+    def process( self ):
         # Génère les données
         ldif_data = self.init_ldif( )
         json_data = self.init_json( )
@@ -147,6 +180,6 @@ try:
     Provisioner( )
 except FatalError as e:
     import sys
-    Logging( ).critical( str( e ) )
+    Logging( 'prov' ).critical( str( e ) )
     sys.exit( 1 )
 
