@@ -570,6 +570,7 @@ class LDAPData:
                 from ldap3 import Reader
                 reader = Reader( ldap_conn , obj_person , people_dn )
                 cursor = reader.search_paged( 10 , True )
+                all_uids = set( )
                 accounts = {}
 
                 # On lit les comptes, en se limitant si nécessaire via la
@@ -580,6 +581,7 @@ class LDAPData:
                             'synchronisation limitée à {} comptes'.format(
                                 limit ) )
                 for entry in cursor:
+                    all_uids.add( str( entry.uid ) )
                     try:
                         a = SyncAccount( cfg ).from_ldap_entry( entry )
                     except AttributeError as e:
@@ -601,9 +603,9 @@ class LDAPData:
                     if len( accounts ) == limit:
                         break
 
-                Logging( 'ldap' ).info( '{} comptes chargés'.format(
-                        len( accounts ) ) )
-                return accounts
+                Logging( 'ldap' ).info( '{} comptes chargés sur {} UIDs'.format(
+                        len( accounts ) , len( all_uids ) ) )
+                return ( all_uids , accounts )
 
             def read_groups_( ):
                 """
@@ -626,10 +628,13 @@ class LDAPData:
                             entry.cn.value ) )
                 return groups
 
-            def set_account_groups_( ):
+            def set_account_groups_( all_uids ):
                 """
                 Parcourt la liste des groupes afin d'ajouter à chaque compte les
                 groupes dont il est membre.
+
+                :param set all_uids: l'ensemble des UID valables, y compris \
+                        ceux qui ne correspondent pas à des comptes
                 """
                 eppn_domain = cfg.get( 'ldap' , 'eppn-domain' )
                 # On ajoute les groupes aux comptes
@@ -638,6 +643,8 @@ class LDAPData:
                         eppn = '{}@{}'.format( uid , eppn_domain )
                         if eppn in self.accounts:
                             self.accounts[ eppn ].add_group( g )
+                            continue
+                        if uid in all_uids:
                             continue
                         Logging( 'ldap' ).warning(
                                 'Groupe {} - utilisateur {} inconnu'.format( g ,
@@ -656,8 +663,8 @@ class LDAPData:
                             a.eppn , a.cos ) )
 
             self.groups = read_groups_( )
-            self.accounts = read_accounts_( )
-            set_account_groups_( )
+            ( all_uids , self.accounts ) = read_accounts_( )
+            set_account_groups_( all_uids )
             set_account_cos_( )
 
     def remove_alias_accounts( self ):
