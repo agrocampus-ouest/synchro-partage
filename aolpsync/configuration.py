@@ -293,5 +293,14 @@ class Config:
             raise FatalError( "Échec de la connexion au service BSS" )
 
     def alias_commands( self ):
-        from .aliases import AliasCommands
-        return AliasCommands( self )
+        """
+        Accède à une instance (unique) de gestion des commandes d'obtention
+        d'aliases supplémentaires. Si l'instance n'avait pas encore été créée,
+        elle le sera.
+
+        :return: l'instance de gestion des commandes d'obtention d'aliases
+        """
+        if not hasattr( self , 'alias_commands_' ):
+            from .aliases import AliasCommands
+            self.alias_commands_ = AliasCommands( self )
+        return self.alias_commands_
