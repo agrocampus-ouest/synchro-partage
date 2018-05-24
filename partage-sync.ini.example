@@ -137,6 +137,11 @@ default-cos=etu_sa_agrocampus-ouest
 # en jours. (OBLIGATOIRE)
 deletion-threshold=160
 
+# Normalement, si le domaine BSS est différent du domaine spécifié dans le LDAP,
+# les adresses seront corrigées automatiquement. Si la ligne ci-dessous n'est
+# pas commentée, cette correction sera désactivée.
+#dont-fix-domains
+
 # Règles supplémentaires pour l'assignement de classe de service
 # Chaque règle doit porter le nom d'une classe de service. La syntaxe à utiliser
 # pour la règle elle-même est décrite en en-tête de ce fichier.

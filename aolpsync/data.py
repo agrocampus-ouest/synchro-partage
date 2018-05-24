@@ -736,6 +736,8 @@ class LDAPData:
 
         :param Config cfg: la configuration
         """
+        if cfg.has_flag( 'bss' , 'dont-fix-domains' ): return
+
         ldap_dom = '@{}'.format( cfg.get( 'ldap' , 'mail-domain' ) )
         bss_dom = '@{}'.format( cfg.get( 'bss' , 'domain' ) )
         if ldap_dom == bss_dom:
