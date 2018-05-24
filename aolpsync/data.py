@@ -602,10 +602,10 @@ class LDAPData:
                         continue
 
                     # Redirection?
-                    if not a.mail.endswith( mail_domain ):
-                        Logging( 'ldap' ).warning(
-                                'Compte LDAP {}: redirection vers {}' .format(
-                                    str( entry.uid ) , a.mail ) )
+                    if not a.ldapMail.endswith( mail_domain ):
+                        Logging( 'ldap' ).info( (
+                                'Compte LDAP {}: redirection vers {} ignorée'
+                            ).format( str( entry.uid ) , a.mail ) )
                         continue
 
                     accounts[ a.eppn ] = a
