@@ -306,13 +306,14 @@ class SyncAccount:
 
     #---------------------------------------------------------------------------
 
-    def to_json( self ):
+    def to_json_record( self ):
         """
-        Convertit les données de synchronisation en un enregistrement JSON. Les
-        attributs vides (valeurs None ou bien listes/ensembles/dictionnaires
-        vides) seront ignorés.
+        Convertit les données de synchronisation en un enregistrement destiné à
+        être sauvegardé sous forme de JSON. Les attributs vides (valeurs None ou
+        bien listes/ensembles/dictionnaires vides) seront ignorés.
 
-        :return: les données au format JSON
+        :return: les données sous la forme d'un dictionnaire pouvant être \
+                sérialisé en JSON
         """
         d = {}
         for a in SyncAccount.STORAGE:
@@ -322,9 +323,18 @@ class SyncAccount:
             if type( av ) in ( list , set , dict ) and not av:
                 continue
             d[ a ] = av
+        return d
 
+    def to_json( self ):
+        """
+        Convertit les données de synchronisation en un enregistrement JSON. Les
+        attributs vides (valeurs None ou bien listes/ensembles/dictionnaires
+        vides) seront ignorés.
+
+        :return: les données au format JSON
+        """
         from .utils import json_dump
-        return json_dump( d )
+        return json_dump( self.to_json_record( ) )
 
     def to_bss_account( self , coses ):
         """
