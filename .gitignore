@@ -3,3 +3,4 @@
 partage-sync.ini
 *.pyc
 __pycache__
+test-*

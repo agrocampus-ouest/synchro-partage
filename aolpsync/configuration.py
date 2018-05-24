@@ -81,6 +81,9 @@ class Config:
     du script.
     """
 
+    # Répertoire contenant les fichiers de configuration
+    CONFIG_DIR = '.'
+
     # Nom de fichier par défaut; sera remplacé lors de l'initialisation du
     # programme afin d'utiliser le chemin du script.
     FILE_NAME = 'partage-sync.ini'
@@ -289,3 +292,6 @@ class Config:
             Logging( 'bss' ).error( "Connexion BSS - erreur: " + str( e ) )
             raise FatalError( "Échec de la connexion au service BSS" )
 
+    def alias_commands( self ):
+        from .aliases import AliasCommands
+        return AliasCommands( self )

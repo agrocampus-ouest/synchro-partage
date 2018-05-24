@@ -102,6 +102,19 @@ eppn-domain=agrocampus-ouest.fr
 
 
 ################################################################################
+# Chargement d'aliases supplémentaires
+################################################################################
+
+# Cette section permet le chargement d'aliases supplémentaires. Chaque entrée
+# contient une commande bash qui sera exécutée afin de récupérer des fichiers
+# d'alias. Si la commande contient la chaîne !configdir!, celle-ci sera
+# remplacée par le nom du répertoire de configuration.
+[aliases]
+	#from-iris=ssh -i "!configdir!/iris.key" rsyncusr@iris echo
+
+
+
+################################################################################
 # Configuration de la base de données
 ################################################################################
 

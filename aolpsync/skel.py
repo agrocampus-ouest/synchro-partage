@@ -1,7 +1,8 @@
+from .aliases import AliasesMap
 from .configuration import Config , CfgOverride
 from .data import SyncAccount
 from .logging import Logging
-from .data import LDAPData , AliasesMap
+from .data import LDAPData
 from .rules import Rule , RuleError
 from .utils import BSSAction , FatalError
 
@@ -267,8 +268,9 @@ class ProcessSkeleton:
         # Initialisation des chemins de configuration
         from os.path import join as opjoin
         cd = self.arguments.config_dir
-        Logging.FILE_NAME = opjoin( cd , 'partage-sync-logging.ini' )
+        Config.CONFIG_DIR = cd
         Config.FILE_NAME = opjoin( cd , 'partage-sync.ini' )
+        Logging.FILE_NAME = opjoin( cd , 'partage-sync-logging.ini' )
 
         self.cfg = Config( self.get_cfg_overrides( ) )
         self.preinit( )
