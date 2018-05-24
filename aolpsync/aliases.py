@@ -3,8 +3,20 @@ from .logging import Logging
 
 
 class AliasCommands:
+    """
+    Support de commandes permettant la récupération de listes d'aliases
+    supplémentaires.
+    """
 
     def __init__( self , cfg ):
+        """
+        Initialise l'instance en se basant sur la section 'aliases' de la
+        configuration. Les commandes présentes dans la section seront lues, et
+        la chaîne spéciale "!configdir!" y sera remplacée par le chemin absolu
+        du répertoire de configuration.
+
+        :param Config cfg: la configuration
+        """
         s = cfg.get_section( 'aliases' )
         self.commands = dict( )
         for cn in s:
@@ -15,11 +27,23 @@ class AliasCommands:
                         cn , self.commands[ cn ] ) )
 
     def get_aliases( self ):
+        """
+        Accède aux aliases supplémentaires. Ils seront chargés si nécessaire.
+
+        :return: un dictionnaire associant à un alias un ensemble de cibles
+        """
         if not hasattr( self , 'fetched_' ):
             self.fetched_ = self.fetch_( )
         return self.fetched_
 
     def fetch_( self ):
+        """
+        Récupère les aliases supplémentaires en exécutant chacune des commandes
+        définies dans la configuration puis en extrayant les données renvoyées
+        par celles-ci.
+
+        :return: un dictionnaire associant à un alias un ensemble de cibles
+        """
         import subprocess
         aliases = {}
         for command in self.commands:
@@ -49,6 +73,15 @@ class AliasCommands:
         return aliases
 
     def process_alias_lines( self , aliases , output ):
+        """
+        Extrait les alias supplémentaires de la sortie d'une commande.
+
+        :param aliases: le dictionnaire des aliases supplémentaires en cours \
+                de construction; il sera mis à jour avec les nouveaux aliases
+        :param output: la liste des lignes lues depuis l'une des commandes; \
+                les lignes sont reçues sous forme de binaires, on les décode \
+                donc en considérant qu'il s'agit d'UTF-8
+        """
         import re
         for line in output:
             try:
