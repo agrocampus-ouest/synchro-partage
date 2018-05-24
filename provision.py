@@ -114,6 +114,7 @@ class Provisioner( ProcessSkeleton ):
             ( 'userPassword' , pw_decoder_ ) ,
             ( 'description' , lambda e : e.cos ) ,
             ( 'Id_eppn' , lambda e : e.eppn ) ,
+            ( 'mail' , lambda e : e.mail ) ,
         ))
 
         # Autres mappings
