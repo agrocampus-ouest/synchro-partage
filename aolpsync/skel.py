@@ -143,6 +143,21 @@ class ProcessSkeleton:
                 ', '.join([ '{} (ID {})'.format( str( c.cn ) , str( c.id ) )
                         for c in coses ]) ) )
 
+    def get_match_rule( self ):
+        """
+        Lit la règle de filtrage des comptes depuis le fichier de configuration.
+
+        :raises FatalError: la règle est incorrecte
+
+        :return: la règle
+        """
+        try:
+            return Rule( 'account selection' ,
+                    self.cfg.get( 'ldap' , 'match-rule' , '(true)' ) )
+        except RuleError as e:
+            Logging( 'cfg' ).critical( str( e ) )
+            raise FatalError( 'Erreur dans la règle de sélection des comptes' )
+
     def load_from_ldap( self ):
         """
         Charge les données depuis le serveur LDAP. Les comptes et groupes
@@ -160,12 +175,7 @@ class ProcessSkeleton:
         ldap_data.clear_empty_sets( )
 
         # Sélection des comptes
-        try:
-            match_rule = Rule( 'account selection' ,
-                    self.cfg.get( 'ldap' , 'match-rule' , '(true)' ) )
-        except RuleError as e:
-            Logging( 'cfg' ).critical( str( e ) )
-            raise FatalError( 'Erreur dans la règle de sélection des comptes' )
+        match_rule = self.get_match_rule( )
         self.ldap_accounts = {}
         for eppn in ldap_data.accounts:
             a = ldap_data.accounts[ eppn ]
