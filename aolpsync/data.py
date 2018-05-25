@@ -265,6 +265,24 @@ class SyncAccount:
             attr( self , entry )
         return self
 
+    def from_json_record( self , data ):
+        """
+        Initialise les attributs à partir d'un enregistrement désérialisé depuis
+        du JSON.
+
+        :param str data: l'enregistrement JSON désérialisé
+
+        :return: l'instance de synchronisation
+        """
+        self.clear( )
+        for a in SyncAccount.STORAGE:
+            if a in data:
+                v = data[ a ]
+            else:
+                v = None
+            setattr( self , a , v )
+        return self
+
     def from_json( self , data ):
         """
         Initialise les attributs à partir d'un enregistrement JSON.
@@ -274,15 +292,7 @@ class SyncAccount:
         :return: l'instance de synchronisation
         """
         from .utils import json_load
-        self.clear( )
-        d = json_load( data )
-        for a in SyncAccount.STORAGE:
-            if a in d:
-                v = d[ a ]
-            else:
-                v = None
-            setattr( self , a , v )
-        return self
+        return self.from_json_record( json_load( data ) )
 
     def copy_details_from( self , other ):
         """
