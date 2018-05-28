@@ -139,6 +139,7 @@ class ProcessSkeleton:
                     repr( error ) ) )
             raise FatalError( 'Impossible de lire la liste des CoS' )
         self.coses = { c.cn : c.id for c in coses }
+        self.reverse_coses = { c.id : c.cn for c in coses }
         Logging( 'bss' ).debug( 'Classes de service: {}'.format(
                 ', '.join([ '{} (ID {})'.format( str( c.cn ) , str( c.id ) )
                         for c in coses ]) ) )
