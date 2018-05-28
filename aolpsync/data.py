@@ -252,6 +252,38 @@ class SyncAccount:
         for attr in SyncAccount.STORAGE:
             setattr( self , attr , None )
 
+    def copy_details_from( self , other ):
+        """
+        Copie les champs de détails d'un compte vers l'instance actuelle.
+
+        :param SyncAccount other: l'instance depuis laquelle on veut copier \
+                les champs de détails
+        """
+        for d in SyncAccount.DETAILS:
+            setattr( self , d , getattr( other , d ) )
+
+    def clear_empty_sets( self ):
+        """
+        'Corrige' les attributs en remplaçant les ensembles vides par des
+        valeurs non définies.
+        """
+        for attr in SyncAccount.STORAGE:
+            av = getattr( self , attr )
+            if isinstance( av , set ) and not av:
+                setattr( self , attr , None )
+
+    def add_group( self , group ):
+        """
+        Ajoute un groupe au compte.
+
+        :param str group: le nom du groupe à ajouter
+        """
+        if self.groups is None:
+            self.groups = set( )
+        self.groups.add( group )
+
+    #---------------------------------------------------------------------------
+
     def from_ldap_entry( self , entry ):
         """
         Initialise les attributs à partir d'une entrée LDAP.
@@ -264,6 +296,8 @@ class SyncAccount:
         for attr in self.LDAP:
             attr( self , entry )
         return self
+
+    #---------------------------------------------------------------------------
 
     def from_json_record( self , data ):
         """
@@ -293,28 +327,6 @@ class SyncAccount:
         """
         from .utils import json_load
         return self.from_json_record( json_load( data ) )
-
-    def copy_details_from( self , other ):
-        """
-        Copie les champs de détails d'un compte vers l'instance actuelle.
-
-        :param SyncAccount other: l'instance depuis laquelle on veut copier \
-                les champs de détails
-        """
-        for d in SyncAccount.DETAILS:
-            setattr( self , d , getattr( other , d ) )
-
-    def clear_empty_sets( self ):
-        """
-        'Corrige' les attributs en remplaçant les ensembles vides par des
-        valeurs non définies.
-        """
-        for attr in SyncAccount.STORAGE:
-            av = getattr( self , attr )
-            if isinstance( av , set ) and not av:
-                setattr( self , attr , None )
-
-    #---------------------------------------------------------------------------
 
     def to_json_record( self ):
         """
@@ -346,6 +358,8 @@ class SyncAccount:
         from .utils import json_dump
         return json_dump( self.to_json_record( ) )
 
+    #---------------------------------------------------------------------------
+
     def to_bss_account( self , coses ):
         """
         Crée une instance de compte Partage contenant les informations requises
@@ -368,25 +382,63 @@ class SyncAccount:
             ra.zimbraCOSId = coses[ self.cos ]
         return ra
 
-    #---------------------------------------------------------------------------
-
-    def add_group( self , group ):
+    def from_bss_account( self , account , rev_coses ):
         """
-        Ajoute un groupe au compte.
+        Convertit un compte Partage dont les détails ont été lus via l'API BSS
+        en un compte de synchronisation. Le mail sera lu depuis le nom du
+        compte, les détails seront copiés, la classe de service retrouvée grâce
+        au dictionnaire, et le ou les aliases, s'il y en a, seront initialisés.
 
-        :param str group: le nom du groupe à ajouter
+        :param account: le compte Partage dont il faut copier les détails
+        :param rev_coses: le dictionnaire inversé (i.e. ID -> nom) des \
+                classes de service
+
+        :raises AccountStateError: l'identifiant de la classe de service est \
+                inconnu
+
+        :return: l'instance
         """
-        if self.groups is None:
-            self.groups = set( )
-        self.groups.add( group )
+        # Initialisation
+        self.clear( )
+        self.mail = account.name
 
+        # État de pré-suppression
+        import re
+        re_match = re.match( r'^del-(\d+)-.*' , account.name )
+        if account.zimbraAccountStatus == 'closed' and re_match:
+            self.markedForDeletion = int( re_match.group( 1 ) )
+
+        # Copie des attributs
+        for bss_attr in SyncAccount.BSS:
+            v = getattr( account , bss_attr )
+            if v is not None:
+                setattr( self , SyncAccount.BSS[ bss_attr ] , v )
+        # Aliases
+        aliases = account.zimbraMailAlias
+        if aliases is not None and aliases:
+            if isinstance( aliases , str ):
+                self.aliases = set([ aliases ])
+            else:
+                self.aliases = set( aliases )
+        # Classe de service
+        cosId = account.zimbraCOSId
+        if cosId is None:
+            Logging( 'bss' ).info( 'compte {}: pas de CoS'.format( self.eppn ) )
+        else:
+            if cosId not in rev_coses:
+                raise AccountStateError(
+                        "compte {}: identifiant CoS {} inconnu".format(
+                            self.eppn , cosId ) )
+            self.cos = rev_coses[ cosId ]
+        return self
 
     #---------------------------------------------------------------------------
 
     def __repr__( self ):
-        return 'SyncAccount(' + ','.join( [
-            a + '=' + repr( getattr( self , a ) )
-                for a in SyncAccount.STORAGE ] )
+        return 'SyncAccount({})'.format( ','.join( [
+                    a + '=' + repr( getattr( self , a ) )
+                        for a in SyncAccount.STORAGE
+            ] ) )
 
     def __str__( self ):
         if self.eppn is None:
@@ -414,6 +466,24 @@ class SyncAccount:
         """
         return False in ( getattr( self , d ) == getattr( other , d )
                                 for d in SyncAccount.DETAILS )
+
+    def bss_equals( self , other ):
+        """
+        Vérifie si deux comptes sont équivalents par rapport aux détails
+        disponibles via l'API Partage. Cela vérifie le champ mail, les détails
+        et les aliases.
+
+        :param SyncAccount other: l'instance avec laquelle on doit comparer
+        :return: True si les deux comptes sont équivalents, False dans le \
+                cas contraire
+        """
+        return ( self.mail == other.mail
+                and self.markedForDeletion == other.markedForDeletion
+                and not self.details_differ( other )
+                and self.aliases == other.aliases )
+
+    def is_predeleted( self ):
+        return self.markedForDeletion is not None
 
 
 #-------------------------------------------------------------------------------
