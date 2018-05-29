@@ -278,6 +278,13 @@ class Consolidator( ProcessSkeleton ):
             Logging( 'bss' ).info( '{} comptes lus'.format( len( accounts ) ) )
         return None if failed else accounts
 
+    def init( self ):
+        self.bss_accounts = self.fetch_bss_data( )
+        if self.bss_accounts is None:
+            raise FatalError( 'Échec de la lecture de la liste des comptes' )
+
+    #---------------------------------------------------------------------------
+
     def list_eppns_in( self , **kwargs ):
         sources = ( 'bss' , 'ldap' , 'db' )
         assert kwargs
@@ -433,11 +440,8 @@ class Consolidator( ProcessSkeleton ):
                 ldap = False , db = False , bss = True )
 
     def process( self ):
-        print( repr( self.ldap_accounts.keys( ) ) )
-        self.bss_accounts = self.fetch_bss_data( )
-        if self.bss_accounts is None:
-            raise FatalError( 'Échec de la lecture de la liste des comptes' )
-        self.failures = dict( )
+        self.checked = set( )
+        self.results = dict( )
         self.run_checks( )
 
 
