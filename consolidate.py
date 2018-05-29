@@ -161,6 +161,16 @@ from aolpsync import *
 
 
 class AccountState:
+    """
+    Décrit les différents états qui peuvent être détectés pour un EPPN.
+
+    :ivar bool is_error: drapeau qui indique si l'état est une erreur
+    :ivar int code: code de l'état
+    :ivar str text: description courte de l'état
+    :ivar str color: couleur à utiliser dans le rapport HTML
+    :ivar str description: description de l'état à afficher dans le rapport HTML
+    :ivar str action: action corrective effectuée
+    """
 
     def __init__( self , is_err , code , text , color , description ,
             action = None ):
@@ -173,19 +183,28 @@ class AccountState:
 
 
 class Consolidator( ProcessSkeleton ):
+    """
+    Script de consolidation du système de synchronisation.
+
+    Ce script vérifie la cohérence des données entre l'annuaire LDAP, la base de
+    données de synchronisation et le serveur Partage. Il peut essayer de
+    corriger certains problèmes, générer un rapport et envoyer des mails
+    d'avertissement.
+    """
 
     def cli_description( self ):
         return '''Tente de consolider les données présentes dans la base locale
                   à partir des informations du serveur de Renater.
 
-                  Ce script devrait être utilisé afin de s'assurer que les
-                  modifications effectuées à partir de l'interface Web ne sont
-                  pas perdues, et aussi pour vérifier la cohérence des diverses
-                  sources d'information.'''
+                  Ce script devrait être utilisé afin de s'assurer de la
+                  cohérence des diverses sources d'information utilisées.'''
 
     #---------------------------------------------------------------------------
 
     def preinit( self ):
+        """
+        Initialise le dictionaire des états possibles.
+        """
         AS = AccountState
         self.states = { a.code : a for a in (
             # États OK
@@ -326,6 +345,13 @@ class Consolidator( ProcessSkeleton ):
         return bss_accounts
 
     def fetch_bss_data( self ):
+        """
+        Tente de lire la liste des comptes définis sur le serveur Partage et de
+        télécharger leurs informations complètes.
+
+        :return: un dictionnaire associant à chaque EPPN présent sur le \
+                serveur Partage un enregistrement SyncAccount le décrivant
+        """
         failed = False
         accounts = {}
 
@@ -347,11 +373,16 @@ class Consolidator( ProcessSkeleton ):
                 Logging( 'bss' ).warning( str( e ) )
             accounts[ account.eppn ] = account
 
-        if not failed:
-            Logging( 'bss' ).info( '{} comptes lus'.format( len( accounts ) ) )
-        return None if failed else accounts
+        if failed:
+            return None
+        Logging( 'bss' ).info( '{} comptes lus'.format( len( accounts ) ) )
+        return accounts
 
     def init( self ):
+        """
+        Télécharge les informations des comptes depuis le serveur Partage. Si
+        le téléchargement échoue, on ne poursuit pas.
+        """
         self.bss_accounts = self.fetch_bss_data( )
         if self.bss_accounts is None:
             raise FatalError( 'Échec de la lecture de la liste des comptes' )
@@ -359,6 +390,15 @@ class Consolidator( ProcessSkeleton ):
     #---------------------------------------------------------------------------
 
     def list_eppns_in( self , **kwargs ):
+        """
+        Génère un ensemble d'EPPNs correspondant aux paramètres. Pour l'une des
+        sources (bss, ldap ou db), on spécifie un booléen ou None. On calcule
+        l'intersection des comptes sur les sources pour lesquelles la valeur est
+        True, on y enlève les sources pour lesquelles la valeur est False, et on
+        ignore les sources pour lesquelles la valeur est None.
+
+        :return: l'ensemble des EPPNs qui correspondent aux critères indiqués
+        """
         sources = ( 'bss' , 'ldap' , 'db' )
         assert kwargs
         assert not ( set( kwargs ) - set( sources ) )
@@ -384,6 +424,13 @@ class Consolidator( ProcessSkeleton ):
         return eppns
 
     def run_account_check( self , eppn , func ):
+        """
+        Exécute une vérification sur un EPPN.
+
+        :param str eppn: l'EPPN à vérifier
+        :param func: une fonction prenant 4 paramètres (EPPN, compte LDAP, \
+                entrée BDD, compte Partage) qui effectue les vérifications
+        """
         la = ( self.ldap_accounts[ eppn ] if eppn in self.ldap_accounts
                 else None )
         db = ( self.db_accounts[ eppn ] if eppn in self.db_accounts
@@ -403,12 +450,27 @@ class Consolidator( ProcessSkeleton ):
                 self.result( eppn , 99 )
 
     def run_check( self , func , **kwargs ):
+        """
+        Exécute une fonction de vérification sur un ensemble de comptes.
+
+        :param func: une fonction prenant 4 paramètres (EPPN, compte LDAP, \
+                entrée BDD, compte Partage) qui effectue les vérifications
+        :param ldap: inclure/exclure les comptes LDAP ?
+        :param db: inclure/exclure les entrées de base de données ?
+        :param bss: inclure/exclure les comptes Partage ?
+        """
         for eppn in self.list_eppns_in( **kwargs ):
             if eppn in self.checked:
                 continue
             self.run_account_check( eppn , func )
 
     def result( self , eppn , code ):
+        """
+        Enregistre et journalise le résultat des vérifications pour un EPPN.
+
+        :param str eppn: l'EPPN pour lequel la vérification a été effectuée
+        :param int code: le code de l'état pour cet EPPN
+        """
         assert code in self.states
         state = self.states[ code ]
         s = "Compte {} - code {:0>2} - {}{}".format( eppn , code , state.text ,
@@ -422,10 +484,20 @@ class Consolidator( ProcessSkeleton ):
         self.results[ eppn ] = state
         self.checked.add( eppn )
 
-    def run_checks( self ):
-        # Vérification comptes existants dans les 3 bases
-        #               (cas 01, 11, 13, 33, 34)
+    def process( self ):
+        """
+        Lance les différentes vérifications et stocke les résultats. Ceux-ci
+        seront exploités dans la phase suivante pour générer rapports et mails
+        d'avertissement.
+        """
+        self.checked = set( )
+        self.results = dict( )
+
         def check_common_accounts_( eppn , ldap , db , bss ):
+            """
+            Vérification des comptes existants dans les 3 bases (cas 01, 11, 13,
+            33, 34)
+            """
             if db.bss_equals( bss ):
                 if db == ldap:
                     self.result( eppn , 1 )
@@ -438,9 +510,11 @@ class Consolidator( ProcessSkeleton ):
             else:
                 self.result( eppn , 34 )
 
-        # Vérification des comptes présents sur DB et BSS, mais pas en LDAP
-        #               (cas 02, 12, 24, 31, 32, 35)
         def check_noldap_accounts_( eppn , ldap , db , bss ):
+            """
+            Vérification des comptes présents sur DB et BSS, mais pas en LDAP
+            (cas 02, 12, 24, 31, 32, 35)
+            """
             if db.bss_equals( bss ):
                 if db.markedForDeletion is not None:
                     self.result( eppn , 2 )
@@ -460,9 +534,11 @@ class Consolidator( ProcessSkeleton ):
             else:
                 self.result( eppn , 32 )
 
-        # Comptes figurant dans le LDAP et dans le BSS, mais pas dans la base.
-        #               (cas 22, 30)
         def check_nodb_accounts_( eppn , ldap , db , bss ):
+            """
+            Vérification des comptes figurant dans le LDAP et dans le BSS, mais
+            pas dans la base (cas 22, 30)
+            """
             if ldap.bss_equals( bss ):
                 opw = ldap.passwordHash
                 ldap.passwordHash = b'{SSHA}invalide'
@@ -472,24 +548,30 @@ class Consolidator( ProcessSkeleton ):
             else:
                 self.result( eppn , 30 )
 
-        # Comptes figurant dans le LDAP et la DB, mais pas sur le BSS.
-        #               (cas 20, 21)
         def check_nobss_accounts_( eppn , ldap , db , bss ):
+            """
+            Vérification des comptes figurant dans le LDAP et la DB, mais pas
+            sur le BSS. (cas 20, 21)
+            """
             if ldap == db:
                 self.result( eppn , 20 )
             else:
                 self.result( eppn , 21 )
             self.remove_account( ldap )
 
-        # Comptes figurant uniquement dans la base de données
-        #               (cas 25)
         def handle_dbonly_accounts_( eppn , ldap , db , bss ):
+            """
+            Gestion des comptes figurant uniquement dans la base de données (cas
+            25).
+            """
             self.remove_account( db )
             self.result( eppn , 25 )
 
-        # Comptes figurant uniquement sur le serveur Partage
-        #               (cas 03, 23)
         def check_bssonly_accounts_( eppn , ldap , db , bss ):
+            """
+            Vérirification des comptes figurant uniquement sur le serveur
+            Partage (cas 03, 23)
+            """
             if bss.is_predeleted( ):
                 self.save_account( bss )
                 self.result( eppn , 23 )
@@ -511,14 +593,19 @@ class Consolidator( ProcessSkeleton ):
         self.run_check( check_bssonly_accounts_ ,
                 ldap = False , db = False , bss = True )
 
-    def process( self ):
-        self.checked = set( )
-        self.results = dict( )
-        self.run_checks( )
-
     #---------------------------------------------------------------------------
 
     def find_report_name( self , base_dir ):
+        """
+        Génère un nom de fichier pour le rapport. Le nom de fichier contiendra
+        la date du jour, ainsi qu'un numéro de série qui sera incrémenté à
+        chaque nouveau rapport généré ce jour-là.
+
+        :param str base_dir: le chemin du répertoire dans lequel les rapports \
+                seront générés
+
+        :return: un nom de fichier pour le rapport
+        """
         from datetime import date
         from pathlib import Path
         import os.path
@@ -534,6 +621,13 @@ class Consolidator( ProcessSkeleton ):
             i += 1
 
     def generate_html_report( self ):
+        """
+        Génère et enregistre le rapport au format HTML correspondant à cette
+        exécution du script.
+
+        :return: le nom du fichier du rapport, ou None si la génération \
+                ou l'enregistrement ont échoué
+        """
         base_dir = self.cfg.get( 'consolidate' , 'report-path' )
         base_url = self.cfg.get( 'consolidate' , 'report-url' )
         from pathlib import Path
@@ -598,6 +692,7 @@ class Consolidator( ProcessSkeleton ):
                 sections = ''.join( sections ) ,
             )
 
+        # Sauvegarde
         import os.path
         try:
             with open( os.path.join( base_dir , report_name ) , 'w' ) as f:
@@ -612,6 +707,13 @@ class Consolidator( ProcessSkeleton ):
     #---------------------------------------------------------------------------
 
     def connect_smtp( self ):
+        """
+        Établit la connexion au serveur SMTP tel que configuré dans la section
+        'consolidate' du fichier de configuration.
+
+        :return: une connexion au serveur SMTP établie via smtplib, ou None \
+                si la connexion a échoué.
+        """
         Logging( 'cns' ).debug( 'Connexion au serveur SMTP' )
         try:
             import smtplib
@@ -634,6 +736,12 @@ class Consolidator( ProcessSkeleton ):
         return server
 
     def send_mail( self , text ):
+        """
+        Envoit un mail d'avertissement aux adresses spécifiées dans la
+        configuration.
+
+        :param str text: le texte, encodé en UTF-8, du corps du mail.
+        """
         from_addr = self.cfg.get( 'consolidate' , 'mail-from' , 'root' )
         from_name = self.cfg.get( 'consolidate' , 'mail-from-name' , 'Script' )
         to_addresses = [ a.strip( ) for a in self.cfg.get(
@@ -661,6 +769,12 @@ class Consolidator( ProcessSkeleton ):
         server.quit( )
 
     def send_email_report( self , report_name ):
+        """
+        Génère et envoit un mail d'avertissement.
+
+        :param str report_name: le nom du fichier HTML contenant le rapport \
+                complèt
+        """
         errors = { k : v for k , v in self.results.items( ) if v.is_error }
         err_eppns = sorted( errors.keys( ) ,
                 key = lambda x : errors[ x ].code )
@@ -704,9 +818,19 @@ Les erreurs listées ci-dessous ont été détectées.
     #---------------------------------------------------------------------------
 
     def has_failures( self ):
+        """
+        Vérifie si des problèmes ont été détectés.
+
+        :return: True s'il y a des problèmes, False sinon
+        """
         return True in ( s.is_error for s in self.results.values( ) )
 
     def postprocess( self ):
+        """
+        Si des problèmes ont été détectés ou que la génération du rapport est
+        imposée, crée un rapport au format HTML, puis si nécessaire envoit un
+        mail d'avertissement.
+        """
         hf = self.has_failures( )
         if hf or self.cfg.has_flag( 'consolidate' , 'always-generate-report' ):
             report_name = self.generate_html_report( )
