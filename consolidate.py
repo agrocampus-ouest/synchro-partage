@@ -303,40 +303,43 @@ class Consolidator( ProcessSkeleton ):
 
         return eppns
 
+    def run_account_check( self , eppn , func ):
+        la = ( self.ldap_accounts[ eppn ] if eppn in self.ldap_accounts
+                else None )
+        db = ( self.db_accounts[ eppn ] if eppn in self.db_accounts
+                else None )
+        bss = ( self.bss_accounts[ eppn ] if eppn in self.bss_accounts
+                else None )
+
+        try:
+            func( eppn , la , db , bss )
+        except Exception as e:
+            Logging( 'cns' ).critical(
+                    'Exception pendant vérification de {} ({})'.format(
+                            eppn , repr( e ) ) )
+            self.result( eppn , 98 )
+        else:
+            if eppn not in self.checked:
+                self.result( eppn , 99 )
+
     def run_check( self , func , **kwargs ):
         for eppn in self.list_eppns_in( **kwargs ):
             if eppn in self.checked:
                 continue
-            la = ( self.ldap_accounts[ eppn ] if eppn in self.ldap_accounts
-                    else None )
-            db = ( self.db_accounts[ eppn ] if eppn in self.db_accounts
-                    else None )
-            bss = ( self.bss_accounts[ eppn ] if eppn in self.bss_accounts
-                    else None )
-            try:
-                func( eppn , la , db , bss )
-            except Exception as e:
-                Logging( 'cns' ).critical(
-                        'Exception pendant vérification de {} ({})'.format(
-                                eppn , repr( e ) ) )
-                self.result( eppn , 98 )
-            else:
-                if eppn not in self.checked:
-                    self.result( eppn , 99 )
+            self.run_account_check( eppn , func )
 
     def result( self , eppn , code ):
         assert code in self.states
         state = self.states[ code ]
-        logger = Logging( 'cns' )
+        s = "Compte {} - code {:0>2} - {}{}".format( eppn , code , state.text ,
+                ' ({})'.format( state.action )
+                        if state.action is not None
+                        else '' )
         if state.is_error:
-            lfunc = logger.error
-            self.failures[ eppn ] = state
+            Logging( 'cns' ).error( s )
         else:
-            lfunc = logger.info
-        lfunc( "Compte {} - code {:0>2} - {}{}".format(
-                eppn , code , state.text ,
-                ' ({})'.format( state.action ) if state.action is not None
-                    else '' ) )
+            Logging( 'cns' ).info( s )
+        self.results[ eppn ] = state
         self.checked.add( eppn )
 
     def run_checks( self ):
