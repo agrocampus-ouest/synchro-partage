@@ -574,10 +574,10 @@ class Consolidator( ProcessSkeleton ):
                     code = c.code ,
                     state = c.text ,
                     count = case_counts[ c.code ] ,
-                    cases = '<li>{}</li>'.format( '</li>\n<li>'.join(
+                    cases = '<li>{}</li>'.format( '</li>\n<li>'.join( sorted(
                             k for k , v in self.results.items( )
                                 if v is c
-                        ) )
+                        ) ) )
             ) for c in cases
         )
 
