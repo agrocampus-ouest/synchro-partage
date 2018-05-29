@@ -185,4 +185,45 @@ page-size=100
 	site=l
 
 
+################################################################################
+# Configuration du script de consolidation
+################################################################################
+
+[consolidate]
+
+# Nom du serveur mail sortant au travers duquel on souhaite envoyer le message.
+# OBLIGATOIRE
+smtp-server=localhost
+
+# Port du serveur SMTP. Défaut 25.
+#smtp-port=25
+
+# Utiliser TLS pour l'envoi de mail?
+#smtp-tls
+
+# Utilisateur sur le serveur SMTP. Si ce champ n'est pas renseigné, aucune
+# authentification n'aura lieu.
+#smtp-user=...
+
+# Mot de passe pour l'authentification SMTP. Requis si l'utilisateur est défini.
+#smtp-password=...
+
+# Adresse d'envoi du mail. OBLIGATOIRE.
+mail-from=noreply@agrocampus-ouest.fr
+
+# Nom à utiliser dans le champ From: du mail envoyé. OBLIGATOIRE.
+mail-from-name=Consolidation LDAP / Partage
+
+# Adresses auxquelles un mail sera envoyé si des problèmes sont détectés. Des
+# virgules peuvent être utilisées pour séparer plusieurs adresses. OBLIGATOIRE.
+mail-to=dsi@agrocampus-ouest.fr
+
+# Ne doit-on générer un rapport HTML que s'il y a des erreurs, ou doit-on le
+# générer à chaque exécution? Par défaut, on ne génère que s'il y a des erreurs.
+#always-generate-report
+
+# Chemin du répertoire dans lequel les rapports HTML seront écrits.
+report-path=/var/www/aolpsync-reports
+
+
 # vim: syntax=cfg
