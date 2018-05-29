@@ -259,6 +259,14 @@ class ProcessSkeleton:
         """
         raise NotImplementedError
 
+    def postprocess( self ):
+        """
+        Cette méthode est appelée à la fin du processus, alors que la base de
+        données n'est plus vérouillée. Elle peut être surchargé afin
+        d'implémenter par exemple des envois de mails.
+        """
+        pass
+
     def __init__( self ,
             require_bss = True ,
             require_cos = True ,
@@ -307,4 +315,5 @@ class ProcessSkeleton:
             with db.begin( write = False ) as txn:
                 self.load_db_accounts( txn )
             self.process( )
+        self.postprocess( )
 
