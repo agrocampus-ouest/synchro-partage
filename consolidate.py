@@ -17,7 +17,7 @@ from aolpsync import *
 #   ✓ 20 | A         | A         | -         | NOK/B-
 #   ✓ 21 | B         | A         | -         | NOK/B-
 #   ✓ 22 | A         | -         | A         | NOK/B+
-#     23 | -         | -         | Ap        | NOK/B+
+#   ✓ 23 | -         | -         | Ap        | NOK/B+
 #   ✓ 24 | -         | Ap        | Bp        | NOK/B~
 #   ✓ 25 | -         | A/Ap      | -         | NOK/B-
 #     ---+-----------+-----------+-----------+------------------------------
@@ -180,6 +180,8 @@ class Consolidator( ProcessSkeleton ):
                   pas perdues, et aussi pour vérifier la cohérence des diverses
                   sources d'information.'''
 
+    #---------------------------------------------------------------------------
+
     def preinit( self ):
         AS = AccountState
         self.states = { a.code : a for a in (
@@ -209,6 +211,8 @@ class Consolidator( ProcessSkeleton ):
             AS(  True , 98 , 'Erreur interne' ) ,
             AS(  True , 99 , 'Pas de résultat' ) ,
         ) }
+
+    #---------------------------------------------------------------------------
 
     def list_bss_accounts( self ):
         """
@@ -423,7 +427,6 @@ class Consolidator( ProcessSkeleton ):
             else:
                 self.result( eppn , 3 )
 
-        self.checked = set( )
         self.run_check( check_common_accounts_ ,
                 ldap = True , db = True , bss = True )
         self.run_check( check_noldap_accounts_ ,
@@ -439,10 +442,105 @@ class Consolidator( ProcessSkeleton ):
         self.run_check( check_bssonly_accounts_ ,
                 ldap = False , db = False , bss = True )
 
+    def has_failures( self ):
+        return True in ( s.is_error for s in self.results.values( ) )
+
+    #---------------------------------------------------------------------------
+
+    def connect_smtp( self ):
+        Logging( 'cns' ).debug( 'Connexion au serveur SMTP' )
+        try:
+            import smtplib
+            server = smtplib.SMTP(
+                    self.cfg.get( 'consolidate' , 'smtp-server' ) ,
+                    int( self.cfg.get( 'consolidate' , 'smtp-port' , 25 ) ) )
+            server.ehlo( )
+            if self.cfg.has_flag( 'consolidate' , 'smtp-tls' ):
+                server.starttls( )
+                server.ehlo( )
+            user = self.cfg.get( 'consolidate' , 'smtp-user' , '' )
+            if user:
+                server.login( user ,
+                        self.cfg.get( 'consolidate' , 'smtp-password' ) )
+        except Exception as e:
+            Logging( 'cns' ).critical(
+                    'Impossible de se connecter au serveur SMTP: {}'.format(
+                        repr( e ) ) )
+            return None
+        return server
+
+    def send_mail( self , text ):
+        from_addr = self.cfg.get( 'consolidate' , 'mail-from' , 'root' )
+        from_name = self.cfg.get( 'consolidate' , 'mail-from-name' , 'Script' )
+        to_addresses = [ a.strip( ) for a in self.cfg.get(
+                'consolidate' , 'mail-to' , 'root' ).split( ',' ) ]
+
+        from email.message import EmailMessage
+        from email.headerregistry import Address
+
+        msg = EmailMessage( )
+        msg[ 'Subject' ] = "LDAP/Partage > Problèmes lors de la consolidation"
+        msg[ 'To' ] = ', '.join( to_addresses )
+        msg[ 'From' ] = Address( from_name , from_addr )
+        msg.set_content( text )
+
+        server = self.connect_smtp( )
+        if not server: return
+        Logging( 'cns' ).info( 'Envoi du rapport d\'erreur' )
+        try:
+            server.send_message( msg , from_addr = from_addr ,
+                    to_addrs = to_addresses )
+        except Exception as e:
+            Logging( 'cns' ).critical(
+                    'Échec de l\'envoi du rapport d\'erreur: {}'.format(
+                        repr( e ) ) )
+        server.quit( )
+
+    def send_email_report( self ):
+        errors = { k : v for k , v in self.results.items( ) if v.is_error }
+        err_eppns = sorted( errors.keys( ) ,
+                key = lambda x : errors[ x ].code )
+
+        text = '''\
+Des erreurs ont été détectées lors de la consolidation du système de
+synchronisation entre l'annuaire LDAP et le serveur Partage.
+
+Nombre d'EPPNs vérifiés ... {:>4}
+Nombre d'erreurs .......... {:>4}
+
+Les erreurs listées ci-dessous ont été détectées.
+
+'''.format( len( self.results ) , len( errors ) )
+
+        prev_code = -1
+        for eppn in err_eppns:
+            error = errors[ eppn ]
+            if error.code != prev_code:
+                hdr = 'Code {:0>2} - {}{}'.format( error.code , error.text ,
+                        ' (action corrective: {})'.format( error.action )
+                            if error.action is not None
+                            else '' )
+                fmt = '\n{}\n{:->' + str( len( hdr ) + 1 ) + '}\n'
+                text += fmt.format( hdr , '' )
+                prev_code = error.code
+            text += '  {}\n'.format( eppn )
+
+        self.send_mail( text )
+
+    #---------------------------------------------------------------------------
+
+    def generate_html_report( self ):
+        pass
+
     def process( self ):
         self.checked = set( )
         self.results = dict( )
         self.run_checks( )
+        hf = self.has_failures( )
+        if hf:
+            self.send_email_report( )
+        if hf or cfg.has_flag( 'consolidate' , 'always-generate-report' ):
+            self.generate_html_report( )
 
 
 #-------------------------------------------------------------------------------
