@@ -267,6 +267,21 @@ class ProcessSkeleton:
         """
         pass
 
+    def load_template( self , name ):
+        """
+        Charge un modèle depuis un fichier texte encodé en UTF-8. L'intégralité
+        du texte du fichier sera retourné.
+        """
+        import os.path
+        tp = os.path.join( Config.CONFIG_DIR , name )
+        try:
+            with open( tp , 'r' ) as f:
+                return f.read( )
+        except IOError as e:
+            Logging( ).error( 'Impossible de charger {}: {}'.format(
+                    tp , str( e ) ) )
+            return ''
+
     def __init__( self ,
             require_bss = True ,
             require_cos = True ,
