@@ -162,10 +162,13 @@ from aolpsync import *
 
 class AccountState:
 
-    def __init__( self , is_err , code , text , action = None ):
+    def __init__( self , is_err , code , text , color , description ,
+            action = None ):
         self.is_error = is_err
         self.code = code
         self.text = text
+        self.color = color
+        self.description = description
         self.action = action
 
 
@@ -186,30 +189,96 @@ class Consolidator( ProcessSkeleton ):
         AS = AccountState
         self.states = { a.code : a for a in (
             # États OK
-            AS( False ,  1 , 'LDAP+ DB+ BSS+' ) ,
-            AS( False ,  2 , 'LDAP- DB~ BSS~' ) ,
-            AS( False ,  3 , 'LDAP- DB- / BSS+' ) ,
+            AS( False ,  1 , 'LDAP+ DB+ BSS+' , '#c3ffcd' ,
+                '''Le compte est actif, les données sont identiques dans les
+                   trois systèmes.''' ) ,
+            AS( False ,  2 , 'LDAP- DB~ BSS~' , '#c3ffcd' ,
+                '''Le compte est présupprimé, les données sont identiques
+                   dans la base et sur Partage.''' ) ,
+            AS( False ,  3 , 'LDAP- DB- / BSS+' , '#c3ffcd' ,
+                '''Le compte a été créé sur le Dashboard et n'est pas géré par
+                   les scripts.''' ) ,
             # États en attente de synchro
-            AS( False , 10 , 'LDAP+ / DB- BSS-' ) ,
-            AS( False , 11 , 'LDAP+ / DB+ BSS+' ) ,
-            AS( False , 12 , 'LDAP- / DB+ BSS+' ) ,
-            AS( False , 13 , 'LDAP+ / DB~ BSS~' ) ,
+            AS( False , 10 , 'LDAP+ / DB- BSS-' , '#cdffc3' ,
+                '''Un compte a été créé dans le LDAP mais la synchronisation
+                   vers Partage n'a pas encore eu lieu.''' ) ,
+            AS( False , 11 , 'LDAP+ / DB+ BSS+' , '#cdffc3' ,
+                '''Un compte existant a été mis à jour dans le LDAP mais la
+                   synchronisation vers Partage n'a pas encore eu lieu.''' ) ,
+            AS( False , 12 , 'LDAP- / DB+ BSS+' , '#cdffc3' ,
+				'''Un compte a été supprimé dans le LDAP mais la synchronisation
+				   vers Partage n'a pas encore eu lieu.''' ) ,
+            AS( False , 13 , 'LDAP+ / DB~ BSS~' , '#cdffc3' ,
+                '''Un compte qui avait été présupprimé a été recréé dans le LDAP
+                   mais la synchronisation vers Partage n'a pas encore eu
+				   lieu.''' ) ,
             # États erronés avec correction auto
-            AS(  True , 20 , 'LDAP+ DB+ / BSS-' , 'suppr. base' ) ,
-            AS(  True , 21 , 'LDAP+ / DB+ / BSS-' , 'suppr. base' ) ,
-            AS(  True , 22 , 'LDAP+ BSS+ / DB-' , 'ajout base' ) ,
-            AS(  True , 23 , 'LDAP- BSS~ / DB-' , 'ajout base' ) ,
-            AS(  True , 24 , 'LDAP- DB~ / BSS~' , 'm.a.j. base' ) ,
+            AS(  True , 20 , 'LDAP+ DB+ / BSS-' , '#f2ffba' ,
+				'''Un compte LDAP existe, ainsi qu'une entrée en base qui y
+				   correspondant exactement. Cependant aucun compte n'existe sur
+				   le serveur Partage.''' ,
+				'suppr. base' ) ,
+            AS(  True , 21 , 'LDAP+ / DB+ / BSS-' , '#f2ffba' ,
+				'''Un compte LDAP existe, ainsi qu'une entrée en base pour ce
+				   compte. L'entrée en base ne correspond pas au compte LDAP,
+				   et aucune correspondante n'est présente sur Partage.''' ,
+				'suppr. base' ) ,
+            AS(  True , 22 , 'LDAP+ BSS+ / DB-' , '#f2ffba' ,
+				'''Un compte LDAP existe et est présent sur Partage avec les
+                   mêmes données; en revanche, aucune entrée n'existe en
+                   base.''' ,
+				'ajout base' ) ,
+            AS(  True , 23 , 'LDAP- BSS~ / DB-' , '#f2ffba' ,
+                '''Un compte correspondant aux critères de présuppression est
+                   présent sur Partage mais n'existe ni dans la base, ni dans le
+                   LDAP.''' ,
+				'ajout base' ) ,
+            AS(  True , 24 , 'LDAP- DB~ / BSS~' , '#f2ffba' ,
+                '''Un compte présupprimé, présent à la fois sur le serveur
+                   Partage et en base de données, a des données
+                   discordantes.''' ,
+				'm.a.j. base' ) ,
+            AS(  True , 25 , 'LDAP- BSS- / DB*' , '#f2ffba' ,
+                '''Un compte n'est présent que dans la base de données; rien n'y
+                   correspond dans le LDAP ou sur Partage.''' ,
+				'suppr. base' ) ,
             # États erronés sans correction auto
-            AS(  True , 30 , 'LDAP+ / DB- / BSS+' ) ,
-            AS(  True , 31 , 'LDAP- DB~ / BSS+' ) ,
-            AS(  True , 32 , 'LDAP- BSS~ / DB+' ) ,
-            AS(  True , 33 , 'LDAP+ DB+ / BSS+' ) ,
-            AS(  True , 34 , 'LDAP+ / DB? / BSS?' ) ,
-            AS(  True , 35 , 'LDAP- / DB+ / BSS+' ) ,
+            AS(  True , 30 , 'LDAP+ / DB- / BSS+' , '#ffbaba' ,
+                '''Un compte existe dans le LDAP avec certaines données, et sur
+                   Partage avec d'autres données, sans être présent en
+                   base.''' ) ,
+            AS(  True , 31 , 'LDAP- DB~ / BSS+' , '#ffbaba' ,
+                '''Un compte est enregistré comme présupprimé dans la base de
+                   données, n'existe pas dans le LDAP, mais le compte Partage
+                   correspondant n'est pas dans un état de présuppression et ses
+                   données sont différentes de celles de la base.''' ) ,
+            AS(  True , 32 , 'LDAP- BSS~ / DB+' , '#ffbaba' ,
+                '''Un compte est marqué comme présupprimé sur Partage, n'est pas
+                   présent dans le LDAP, et existe dans la base de données sans
+                   marqueur de présuppression et avec des données
+                   différentes.''' ) ,
+            AS(  True , 33 , 'LDAP+ DB+ / BSS+' , '#ffbaba' ,
+                '''Les données d'un compte sont cohérentes entre la base de
+                   données et l'annuaire LDAP, mais elles diffèrent sur le
+                   serveur Partage.''' ) ,
+            AS(  True , 34 , 'LDAP+ / DB? / BSS?' , '#ff9090' ,
+                '''Un compte existe sur les trois systèmes mais aucune des trois
+                   entrées ne correspond aux autres. <span
+                   style="font-size:1pt">It's the end of the world as we know
+                   it...</span>''' ) ,
+            AS(  True , 35 , 'LDAP- / DB+ / BSS+' , '#ff9090' ,
+                '''Un compte existe avec des données différentes dans la base de
+                   données et sur Partage, sans marqueur de présuppression; il
+                   n'existe pas dans l'annuaire LDAP. <span
+                   style="font-size:1pt">It's the end of the world as we know
+                   it...</span>''' ) ,
             # Erreur interne / aucun résultat de vérif.
-            AS(  True , 98 , 'Erreur interne' ) ,
-            AS(  True , 99 , 'Pas de résultat' ) ,
+            AS(  True , 98 , 'Erreur interne' , '#ff94c5' ,
+                '''Une erreur du script s'est produite pendant la vérification
+                   de ce compte. Veuillez lire le journal.''' ) ,
+            AS(  True , 99 , 'Pas de résultat' , '#ff94c5' ,
+                '''Le script a vérifié ce compte mais n'a pas renvoyé de
+                   résultat.''' ) ,
         ) }
 
     #---------------------------------------------------------------------------
@@ -442,8 +511,103 @@ class Consolidator( ProcessSkeleton ):
         self.run_check( check_bssonly_accounts_ ,
                 ldap = False , db = False , bss = True )
 
-    def has_failures( self ):
-        return True in ( s.is_error for s in self.results.values( ) )
+    def process( self ):
+        self.checked = set( )
+        self.results = dict( )
+        self.run_checks( )
+
+    #---------------------------------------------------------------------------
+
+    def find_report_name( self , base_dir ):
+        from datetime import date
+        from pathlib import Path
+        import os.path
+        n = date.today( )
+        pattern = 'aolpsync-cns-{:0>4}-{:0>2}-{:0>2}{}'.format(
+                n.year , n.month , n.day , '-{:0>2}.html' )
+        i = 0
+        while True:
+            fn = pattern.format( i )
+            fp = Path( os.path.join( base_dir , fn ) )
+            if not fp.exists( ):
+                return fn
+            i += 1
+
+    def generate_html_report( self ):
+        base_dir = self.cfg.get( 'consolidate' , 'report-path' )
+        base_url = self.cfg.get( 'consolidate' , 'report-url' )
+        from pathlib import Path
+        if base_dir is None or not Path( base_dir ).is_dir( ):
+            Logging( 'cns' ).critical( 'Chemin du rapport mal configuré!' )
+            return None
+        if base_url is None:
+            Logging( 'cns' ).critical( 'URL du rapport manquante!' )
+            return None
+
+        report_name = self.find_report_name( base_dir )
+        Logging( 'cns' ).info( 'Génération du rapport HTML dans {}'.format(
+                report_name ) )
+
+        # Liste des cas
+        cases = sorted( set(( e for e in self.results.values( ) )) ,
+                key = lambda case : case.code )
+        case_counts = {
+            c.code : len([ k for k , v in self.results.items( )
+                        if v is c ])
+                for c in cases
+        }
+        case_template = self.load_template( 'cns-case-template.html' )
+        cases_html = ''.join(
+            case_template.format(
+                code = c.code ,
+                action = '-' if c.action is None else c.action ,
+                count = case_counts[ c.code ] ,
+                bg_color = c.color ,
+                description = c.description ,
+            ) for c in cases
+        )
+
+        # Sections
+        section_template = self.load_template( 'cns-section-template.html' )
+        sections = ''.join(
+            section_template.format(
+                    code = c.code ,
+                    state = c.text ,
+                    count = case_counts[ c.code ] ,
+                    cases = '<li>{}</li>'.format( '</li>\n<li>'.join(
+                            k for k , v in self.results.items( )
+                                if v is c
+                        ) )
+            ) for c in cases
+        )
+
+        # Page finale
+        from datetime import datetime
+        now = datetime.now( )
+        n_errors = len([ 1 for v in self.results.values( ) if v.is_error ])
+        report = self.load_template( 'cns-report-template.html' ).format(
+                day = now.day , month = now.month , year = now.year ,
+                hours = now.hour , minutes = now.minute , seconds = now.second ,
+                c_total = len( self.results ) ,
+                c_ldap = len( self.ldap_accounts ) ,
+                c_db = len( self.db_accounts ) ,
+                c_bss = len( self.bss_accounts ) ,
+                c_errors = n_errors ,
+                bg_errors = 'red' if n_errors else 'green' ,
+                cases_table = cases_html ,
+                sections = ''.join( sections ) ,
+            )
+
+        import os.path
+        try:
+            with open( os.path.join( base_dir , report_name ) , 'w' ) as f:
+                print( report , file = f )
+        except IOError as e:
+            Logging( 'cns' ).critical(
+                    "Impossible de créer le rapport {}: {}".format(
+                        report_name , str( e ) ) )
+            return None
+        return report_name
 
     #---------------------------------------------------------------------------
 
@@ -496,21 +660,31 @@ class Consolidator( ProcessSkeleton ):
                         repr( e ) ) )
         server.quit( )
 
-    def send_email_report( self ):
+    def send_email_report( self , report_name ):
         errors = { k : v for k , v in self.results.items( ) if v.is_error }
         err_eppns = sorted( errors.keys( ) ,
                 key = lambda x : errors[ x ].code )
 
+        if report_name is None:
+            report_info = 'Par ailleurs, la génération du rapport a échoué.'
+        else:
+            base = self.cfg.get( 'consolidate' , 'report-url' )
+            report_info = '''\
+Un rapport détaillé est disponible via l\'URL ci-dessous:
+{}{}{}'''.format( base , '' if base.endswith( '/' ) else '/' , report_name )
+
         text = '''\
 Des erreurs ont été détectées lors de la consolidation du système de
 synchronisation entre l'annuaire LDAP et le serveur Partage.
+
+{}
 
 Nombre d'EPPNs vérifiés ... {:>4}
 Nombre d'erreurs .......... {:>4}
 
 Les erreurs listées ci-dessous ont été détectées.
 
-'''.format( len( self.results ) , len( errors ) )
+'''.format( report_info , len( self.results ) , len( errors ) )
 
         prev_code = -1
         for eppn in err_eppns:
@@ -529,18 +703,17 @@ Les erreurs listées ci-dessous ont été détectées.
 
     #---------------------------------------------------------------------------
 
-    def generate_html_report( self ):
-        pass
+    def has_failures( self ):
+        return True in ( s.is_error for s in self.results.values( ) )
 
-    def process( self ):
-        self.checked = set( )
-        self.results = dict( )
-        self.run_checks( )
+    def postprocess( self ):
         hf = self.has_failures( )
+        if hf or self.cfg.has_flag( 'consolidate' , 'always-generate-report' ):
+            report_name = self.generate_html_report( )
+        else:
+            report_name = None
         if hf:
-            self.send_email_report( )
-        if hf or cfg.has_flag( 'consolidate' , 'always-generate-report' ):
-            self.generate_html_report( )
+            self.send_email_report( report_name )
 
 
 #-------------------------------------------------------------------------------

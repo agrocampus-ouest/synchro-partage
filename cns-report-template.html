@@ -1,0 +1,47 @@
+<html lang="fr">
+	<head>
+		<meta charset="utf-8">
+		<title>Synchronisation LDAP/Partage &gt; Consolidation &gt; Rapport du {day:0>2}/{month:0>2}/{year:0>4}</title>
+	</head>
+	<body>
+		<h1>Synchronisation LDAP/Partage &gt; Consolidation &gt; Rapport du {day:0>2}/{month:0>2}/{year:0>4}</h1>
+		<p>Généré à {hours:0>2}:{minutes:0>2}:{seconds:0>2}</p>
+
+		<h2>Statistiques</h2>
+		<table>
+			<tr>
+				<th style="text-align:right;width:150px">Total&nbsp;:</th>
+				<td style="text-align:right;width:50px">{c_total}</td>
+			</tr>
+			<tr>
+				<th style="text-align:right">LDAP&nbsp;:</th>
+				<td style="text-align:right">{c_ldap}</td>
+			</tr>
+			<tr>
+				<th style="text-align:right">BDD&nbsp;:</th>
+				<td style="text-align:right">{c_db}</td>
+			</tr>
+			<tr>
+				<th style="text-align:right">Partage&nbsp;:</th>
+				<td style="text-align:right">{c_bss}</td>
+			</tr>
+			<tr>
+				<th style="text-align:right">Problèmes&nbsp;:</th>
+				<td style="text-align:right; color: white; background: {bg_errors}">{c_errors}</td>
+			</tr>
+		</table>
+
+		<h2>Cas détectés</h2>
+		<table style="width:100%; border: 1px solid black">
+			<tr>
+				<th style="width: 50px;text-align:center">Code</th>
+				<th style="text-align: left">Description</th>
+				<th style="width: 100px;text-align:center">Action</th>
+				<th style="width: 50px;text-align:center">EPPNs</th>
+			</tr>
+			{cases_table}
+		</table>
+
+		{sections}
+	</body>
+</html>

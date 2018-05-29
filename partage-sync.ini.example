@@ -223,7 +223,11 @@ mail-to=dsi@agrocampus-ouest.fr
 #always-generate-report
 
 # Chemin du répertoire dans lequel les rapports HTML seront écrits.
+# OBLIGATOIRE.
 report-path=/var/www/aolpsync-reports
+
+# URL de base à laquelle les rapports seront accessibles. OBLIGATOIRE.
+report-url=https://partage-sync.agrocampus-ouest.fr/consolidation/
 
 
 # vim: syntax=cfg
