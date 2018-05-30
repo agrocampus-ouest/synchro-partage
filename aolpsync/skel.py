@@ -47,7 +47,7 @@ class ProcessSkeleton:
         cfg_group = parser.add_argument_group( 'Configuration' )
         own_path = os.path.dirname( os.path.realpath( sys.argv[ 0 ] ) )
         cfg_group.add_argument( '-C' , '--config-dir' ,
-                action = 'store' , nargs = 1 , type = str ,
+                action = 'store' , type = str ,
                 help = 'Répertoire des fichiers de configuration' ,
                 metavar = ( 'directory' , ) ,
                 default = own_path )
