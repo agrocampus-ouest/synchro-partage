@@ -218,7 +218,6 @@ class DiffViewer( ProcessSkeleton ):
                     'aliases' , 'markedForDeletion' , 'cos' ):
             self.diff_item_init( di , eppn , field , 'bss' )
 
-        print( di.check_differences( ) )
         return di
 
     def compute_diff( self , eppn ):
@@ -272,7 +271,9 @@ class DiffViewer( ProcessSkeleton ):
                 print( sep2 )
             di.print_data( widths , not self.arguments.no_colors )
 
-        if prev_eppn is not None:
+        if prev_eppn is None:
+            print( "Aucune entrée ne présente de différences." )
+        else:
             print( sep1 )
             print( )
 
