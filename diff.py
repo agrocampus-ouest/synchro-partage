@@ -4,17 +4,38 @@ from aolpsync import *
 
 
 class DiffItem:
+    """
+    Cette classe représente une entrée de données pour un EPPN et un champ. Elle
+    stocke, compare et peut afficher les valeurs.
+    """
 
     COLORS = ( '\033[32m' , '\033[33m' , '\033[31m' , '' )
     DOMAIN = None
 
-    class Unknown: pass
-    class NoAccount: pass
+    class Unknown:
+        """
+        Classe utilisée comme marqueur pour les champs dont la valeur ne peut
+        être connue (par exemple, les entrées venant du BSS ne peuvent avoir
+        d'UID).
+        """
+        pass
 
-    def __init__( self , cfg , eppn , field ):
-        if DiffItem.DOMAIN is None:
-            DiffItem.DOMAIN = '@{}'.format( cfg.get( 'bss' , 'domain' ) )
-        self.cfg = cfg
+    class NoAccount:
+        """
+        Classe utilisée comme marqueur pour les champs d'un enregistrement
+        manquant.
+        """
+        pass
+
+    def __init__( self , eppn , field ):
+        """
+        Initialise une entrée pour un EPPN et un champ. Les valeurs seront
+        initialisées à "inconnu".
+
+        :param str eppn: l'EPPN de l'utilisateur pour lequel on examine les \
+                données
+        :param str field: le nom du champ
+        """
         self.eppn = eppn
         self.field = field
         self.values_ = {
@@ -22,9 +43,18 @@ class DiffItem:
             'db': DiffItem.Unknown ,
             'bss': DiffItem.Unknown ,
         }
-        self.text_ = {}
 
     def set_value( self , source , value ):
+        """
+        Initialise une valeur pour l'une des sources de données. Si la valeur
+        est une chaîne se terminant par le domaine BSS, ou un ensemble de
+        chaînes se terminant par le domaine BSS, le nom de domaine sera remplacé
+        par '[]'.
+
+        :param source: la source de données; doit être 'ldap', 'db' ou 'bss'
+        :param value: la valeur du champ, ou DiffItem.NoAccount si le compte \
+                correspondant n'existe pas
+        """
         assert self.values_[ source ] is not None
         assert self.values_[ source ] == DiffItem.Unknown
         rep_mail = lambda s : ( '{}@[]'.format( s[ :-len( DiffItem.DOMAIN ) ] )
@@ -38,15 +68,40 @@ class DiffItem:
         self.values_[ source ] = value
 
     def display_widths( self ):
+        """
+        Calcule et retourne les largeurs requises pour l'affichage des
+        différentes colonnes.
+
+        :return: un tuple contenant les largeurs pour la colonne LDAP, base de \
+                données et BSS
+        """
         n_lines = self.get_lines_( )
         return tuple( self.get_width_( source , n_lines )
                 for source in ( 'ldap' , 'db' , 'bss' ) )
 
     def get_width_( self , source , n_lines ):
+        """
+        Calcule la largeur requise pour l'affichage des informations concernant
+        une source de données.
+
+        :param source: la source de données ('ldap', 'db' ou 'bss')
+        :param n_lines: le nombre de lignes qui seront affichées
+
+        :return: la largeur requise pour cette source
+        """
         return max( len( self.get_text( source , i ) )
                         for i in range( 0 , n_lines ) )
 
     def get_text( self , source , line ):
+        """
+        Retourne le texte à afficher pour une ligne et source de données.
+
+        :param source: la source de données ('ldap', 'db' ou 'bss')
+        :param line: le numéro de la ligne d'affichage pour laquelle on veut \
+                récupérer le texte.
+
+        :return: le texte à afficher
+        """
         v = self.values_[ source ]
         if ( v is None or isinstance( v , str )
                     or v == DiffItem.NoAccount
@@ -67,6 +122,11 @@ class DiffItem:
         return v[ line ]
 
     def get_lines_( self ):
+        """
+        Calcule le nombre de lignes requises pour l'affichage de cette entrée.
+
+        :return: le nombre de ligne requises
+        """
         if hasattr( self , 'lines_' ):
             return self.lines_
         m = 1
@@ -78,11 +138,30 @@ class DiffItem:
         return m
 
     def check_differences( self ):
+        """
+        Vérifie si des différences existent et assigne chaque donnée à un groupe
+        en fonction de sa valeur. Les données 'inconnues' (i.e. celles qui
+        n'existent pas pour cette source de données) seront ignorées lors de la
+        comparaison.
+
+        :return: un tuple contenant un booléen qui indique si des \
+                modifications ont été trouvées, et un dictionnaire associant \
+                à chaque source de données un groupe (sous la forme d'un \
+                entier entre 0 et 3 - cette dernière valeur indiquant un \
+                champ inconnu).
+        """
         v = self.values_
         groups = {
-            'ldap' : 0 ,
-            'db' : 0 if v[ 'ldap' ] == v[ 'db' ] else 1 ,
+            'ldap' : 3 if v[ 'ldap' ] == DiffItem.Unknown else 0 ,
         }
+
+        if v[ 'db' ] == DiffItem.Unknown:
+            groups[ 'db' ] = 3
+        elif v[ 'ldap' ] == v[ 'db' ]:
+            groups[ 'db' ] = 0
+        else:
+            groups[ 'db' ] = 1
+
         if v[ 'bss' ] == DiffItem.Unknown:
             groups[ 'bss' ] = 3
         elif v[ 'bss' ] == v[ 'ldap' ]:
@@ -91,9 +170,19 @@ class DiffItem:
             groups[ 'bss' ] = groups[ 'db' ]
         else:
             groups[ 'bss' ] = 2
+
         return ( bool( set( groups.values( ) ) - set(( 0 , 3 )) ) , groups )
 
     def print_data( self , widths , color ):
+        """
+        Génère les lignes d'affichage correspondant à cette entrée.
+
+        :param widths: un tuple à 4 éléments indiquant les largeurs des \
+                colonnes correspondant au nom du champ, aux données LDAP, \
+                données base, et données BSS.
+        :param color: un booléen indiquant si l'on veut que le résultat \
+                soit affiché en couleurs.
+        """
         n_lines = self.get_lines_( )
         order = ( 'ldap' , 'db' , 'bss' )
         ( diffs , groups ) = self.check_differences( )
@@ -118,6 +207,10 @@ class DiffItem:
 
 
 class DiffViewer( ProcessSkeleton ):
+    """
+    Implémentation de l'outil de diagnostic permettant l'affichage des
+    différences entre les diverses sources de données.
+    """
 
     def cli_description( self ):
         return '''Outil de diagnostic qui affiche les différences trouvées entre
@@ -140,6 +233,7 @@ class DiffViewer( ProcessSkeleton ):
     #---------------------------------------------------------------------------
 
     def preinit( self ):
+        DiffItem.DOMAIN = '@{}'.format( self.cfg.get( 'bss' , 'domain' ) )
         eppn_domain = self.cfg.get( 'ldap' , 'eppn-domain' )
         self.check_accounts = set((
             eppn if '@' in eppn else ( '{}@{}'.format( eppn, eppn_domain ) )
@@ -150,6 +244,14 @@ class DiffViewer( ProcessSkeleton ):
     #---------------------------------------------------------------------------
 
     def read_bss_account( self , eppn , bss_domain ):
+        """
+        Lit les informations d'un compte sur le serveur Partage et stocke ces
+        informations dans le dictionnaire des comptes Partage après les avoir
+        converties.
+
+        :param eppn: l'EPPN de l'utilisateur à rechercher
+        :param bss_domain: le nom de domaine Partage concerné
+        """
         retr = BSSAction( BSSQuery( 'getAllAccounts' ) ,
                 bss_domain , offset = 0 , limit = 100 ,
                 ldapQuery = '(carLicense={})'.format( eppn ) )
@@ -181,6 +283,10 @@ class DiffViewer( ProcessSkeleton ):
         self.bss_accounts[ eppn ] = account
 
     def init( self ):
+        """
+        Initialise l'outil en lisant les comptes demandés depuis le serveur
+        Partage et en générant la liste des champs à afficher.
+        """
         self.bss_accounts = {}
         Logging( 'diff' ).info( 'Recherche et extraction des comptes BSS' )
         bss_domain = self.cfg.get( 'bss' , 'domain' )
@@ -195,10 +301,17 @@ class DiffViewer( ProcessSkeleton ):
 
     #---------------------------------------------------------------------------
 
-    def diff_item_init( self , di , eppn , field , source ):
+    def di_set_source( self , di , source ):
+        """
+        Initialise un DiffItem pour une source de donnée en allant lire le champ
+        correspondant dans le dictionnaire approprié.
+
+        :param DiffItem di: l'objet à mettre à jour
+        :param source: la source de données ('ldap', 'db' ou 'bss')
+        """
         a = getattr( self , '{}_accounts'.format( source ) )
-        if eppn in a:
-            v = getattr( a[ eppn ] , field )
+        if di.eppn in a:
+            v = getattr( a[ di.eppn ] , di.field )
         else:
             v = DiffItem.NoAccount
 
@@ -209,25 +322,46 @@ class DiffViewer( ProcessSkeleton ):
 
         di.set_value( source , v )
 
-    def compute_diff_item( self , eppn , field ):
-        di = DiffItem( self.cfg , eppn , field )
+    def init_diff_item( self , eppn , field ):
+        """
+        Génère une entrée de liste de différences pour une combinaison EPPN /
+        champ en lisant les valeurs correspondantes.
 
-        self.diff_item_init( di , eppn , field , 'ldap' )
-        self.diff_item_init( di , eppn , field , 'db' )
+        :param str eppn: l'EPPN de l'utilisateur
+        :param str field: le nom du champ
+
+        :return: l'enregistrement de différences
+        """
+        di = DiffItem( eppn , field )
+        self.di_set_source( di , 'ldap' )
+        self.di_set_source( di , 'db' )
         if field in SyncAccount.BSS.values( ) or field in (
                     'aliases' , 'markedForDeletion' , 'cos' ):
-            self.diff_item_init( di , eppn , field , 'bss' )
-
+            self.di_set_source( di , 'bss' )
         return di
 
     def compute_diff( self , eppn ):
-        return [ self.compute_diff_item( eppn , fld )
+        """
+        Génère les enregistrements de différences pour un compte.
+
+        :param str eppn: l'EPPN de l'utilisateur
+        :return: la liste des DiffItem pour chaque champ
+        """
+        return [ self.init_diff_item( eppn , fld )
                         for fld in self.fields ]
 
     def process( self ):
         diffs = []
 
         def find_max_widths_( ):
+            """
+            Identifie les largeurs maximales, sur l'intégralité des
+            enregistrements, pour les différentes colonnes (titre + colonnes de
+            données).
+
+            :return: les largeurs maximales pour les 4 colonnes sous la forme \
+                    d'un tuple
+            """
             wf = 0
             ws = [ 0 , 0 , 0 ]
             for d in diffs:
@@ -237,13 +371,13 @@ class DiffViewer( ProcessSkeleton ):
                     ws[ i ] = max( ws[ i ] , dws[ i ] )
             return ( wf , *ws )
 
-
+        # Génération des entrées de différences
         for eppn in self.check_accounts:
             diffs.extend( self.compute_diff( eppn ) )
         widths = find_max_widths_( )
         total_width = 13 + sum( widths )
 
-        prev_eppn = None
+        # Génération des lignes de séparation des tables
         sep0 = ( '*{:=>' + str( total_width - 2 ) + '}*' ).format( '' )
         sep1 = '*{}*'.format( '*'.join(
                     ( '{:=>' + str( w + 2 ) + '}' )
@@ -253,6 +387,9 @@ class DiffViewer( ProcessSkeleton ):
                     ( '{:->' + str( w + 2 ) + '}' )
                         for w in widths
                     ).format( '' , '' , '' , '' ) )
+
+        # Affichage
+        prev_eppn = None
         for di in diffs:
             if self.arguments.diff_only:
                 diffs = di.check_differences( )[ 0 ]
