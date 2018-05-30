@@ -31,7 +31,6 @@ class DiffItem:
                                     if s.endswith( DiffItem.DOMAIN )
                                     else s )
 
-        print( self.eppn , source , type(value) , value )
         if isinstance( value , set ) or isinstance( value , list ):
             value = sorted( rep_mail( v ) for v in value )
         elif isinstance( value , str ):
@@ -129,6 +128,10 @@ class DiffViewer( ProcessSkeleton ):
         parser.add_argument( '--no-colors' ,
                 action = 'store_true' , default = False ,
                 help = '''Désactive l'affichage couleur.''' )
+        parser.add_argument( '--diff-only' , '-d' ,
+                action = 'store_true' , default = False ,
+                help = '''N'affiche que les lignes présentant une
+                          différence.''' )
         parser.add_argument( 'eppns' ,
                 action = 'store' , nargs = '+' , type = str ,
                 help = '''EPPNs des comptes pour lesquels on veut afficher les
@@ -252,6 +255,10 @@ class DiffViewer( ProcessSkeleton ):
                         for w in widths
                     ).format( '' , '' , '' , '' ) )
         for di in diffs:
+            if self.arguments.diff_only:
+                diffs = di.check_differences( )[ 0 ]
+                if not diffs:
+                    continue
             if prev_eppn != di.eppn:
                 if prev_eppn is not None:
                     print( sep1 )
@@ -264,8 +271,10 @@ class DiffViewer( ProcessSkeleton ):
             else:
                 print( sep2 )
             di.print_data( widths , not self.arguments.no_colors )
-        print( sep1 )
-        print( )
+
+        if prev_eppn is not None:
+            print( sep1 )
+            print( )
 
 
 
