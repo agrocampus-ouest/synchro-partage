@@ -5,14 +5,16 @@ from aolpsync import *
 
 class DiffItem:
 
-    COLORS = (
-        '\033[32m' , '\033[33m' , '\033[31m' , ''
-    )
+    COLORS = ( '\033[32m' , '\033[33m' , '\033[31m' , '' )
+    DOMAIN = None
 
     class Unknown: pass
     class NoAccount: pass
 
-    def __init__( self , eppn , field ):
+    def __init__( self , cfg , eppn , field ):
+        if DiffItem.DOMAIN is None:
+            DiffItem.DOMAIN = '@{}'.format( cfg.get( 'bss' , 'domain' ) )
+        self.cfg = cfg
         self.eppn = eppn
         self.field = field
         self.values_ = {
@@ -25,9 +27,15 @@ class DiffItem:
     def set_value( self , source , value ):
         assert self.values_[ source ] is not None
         assert self.values_[ source ] == DiffItem.Unknown
+        rep_mail = lambda s : ( '{}@[]'.format( s[ :-len( DiffItem.DOMAIN ) ] )
+                                    if s.endswith( DiffItem.DOMAIN )
+                                    else s )
+
         print( self.eppn , source , type(value) , value )
-        if isinstance( value , set ):
-            value = sorted( value )
+        if isinstance( value , set ) or isinstance( value , list ):
+            value = sorted( rep_mail( v ) for v in value )
+        elif isinstance( value , str ):
+            value = rep_mail( value )
         self.values_[ source ] = value
 
     def display_widths( self ):
@@ -199,7 +207,7 @@ class DiffViewer( ProcessSkeleton ):
         di.set_value( source , v )
 
     def compute_diff_item( self , eppn , field ):
-        di = DiffItem( eppn , field )
+        di = DiffItem( self.cfg , eppn , field )
 
         self.diff_item_init( di , eppn , field , 'ldap' )
         self.diff_item_init( di , eppn , field , 'db' )
