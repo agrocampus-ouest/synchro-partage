@@ -336,7 +336,7 @@ class DiffViewer( ProcessSkeleton ):
         self.di_set_source( di , 'ldap' )
         self.di_set_source( di , 'db' )
         if field in SyncAccount.BSS.values( ) or field in (
-                    'aliases' , 'markedForDeletion' , 'cos' ):
+                    'mail' , 'aliases' , 'markedForDeletion' , 'cos' ):
             self.di_set_source( di , 'bss' )
         return di
 
