@@ -445,13 +445,18 @@ class SyncAccount:
             return '(compte invalide)'
         return self.eppn
 
+    def compare_( self , other , attributes ):
+        from .utils import multivalued_check_equals as mce
+        def eq_check_( attr ):
+            va = getattr( self , a , None )
+            vb = getattr( other , b , None )
+            return mce( va , vb )
+        return False not in ( eq_check_( attr ) for a in attributes )
+
     def __eq__( self , other ):
         if type( other ) != type( self ):
             return False
-        return False not in [
-                getattr( self , a , None ) == getattr( other , a , None )
-                    for a in SyncAccount.STORAGE
-            ]
+        return self.compare_( other , SyncAccount.STORAGE )
 
     def __ne__( self , other ):
         return not self.__eq__( other )
@@ -464,8 +469,7 @@ class SyncAccount:
         :param SyncAccount other: l'instance avec laquelle on doit comparer
         :return: True si des différences existent, False dans le cas contraire
         """
-        return False in ( getattr( self , d ) == getattr( other , d )
-                                for d in SyncAccount.DETAILS )
+        return self.compare_( other , SyncAccount.DETAILS )
 
     def bss_equals( self , other ):
         """
@@ -559,11 +563,22 @@ class LDAPData:
                         continue
 
                     # Redirection?
-                    if not a.ldapMail.endswith( mail_domain ):
+                    if isinstance( a.ldapMail , str ):
+                        a.ldapMail = set([ a.ldapMail ])
+                    remove = []
+                    for ma in a.ldapMail:
+                        if ma.endswith( mail_domain ):
+                            continue
                         Logging( 'ldap' ).info( (
                                 'Compte LDAP {}: redirection depuis {} vers '
                                 + '{} ignorée'
-                            ).format( str( entry.uid ) , a.mail , a.ldapMail ) )
+                            ).format( str( entry.uid ) , a.mail , ma ) )
+                        remove.add( ma )
+                    a.ldapMail.difference_update( remove )
+                    if not a.ldapMail:
+                        Logging( 'ldap' ).info(
+                                'Compte LDAP {}: purement externe'.format(
+                                    entry.uid ) )
                         continue
 
                     accounts[ a.eppn ] = a
@@ -642,23 +657,6 @@ class LDAPData:
             set_account_groups_( all_uids )
             set_account_cos_( )
 
-    def remove_alias_accounts( self ):
-        """
-        Supprime de la liste des comptes ceux qui ont été identifiés comme étant
-        de simples redirections.
-        """
-        ignored_accounts = [ a
-                for a in self.accounts
-                if self.accounts[ a ].mail != a
-                    and self.accounts[ a ].mail in self.accounts ]
-        if not ignored_accounts:
-            return
-        for ia in ignored_accounts:
-            Logging( 'ldap' ).info( 'Compte {} ignoré'.format( ia ) )
-            self.accounts.pop( ia )
-        Logging( 'ldap' ).info( '{} comptes ignorés'.format(
-                len( ignored_accounts ) ) )
-
     def set_account_aliases_( self , account , aliases , found ):
         """
         Méthode interne qui identifie les aliases correspondant à un compte LDAP
@@ -669,12 +667,21 @@ class LDAPData:
         :param set found: la liste des comptes ayant déjà été mis à jour
         """
         mn = aliases.get_main_account( account )
+        if mn != account:
+            return
         if mn in found:
-            Logging( 'ldap' ).error(
+            Logging( 'ldap' ).warning(
                     'Compte {} trouvé pour plus d\'une adresse' .format( mn ) )
             return
         found.add( mn )
         self.accounts[ account ].aliases = aliases.get_aliases( mn )
+        delete = []
+        for alias in self.accounts[ account ].aliases:
+            if alias in self.accounts:
+                Logging( 'ldap' ).debug( 'Alias de compte {} ignoré'.format(
+                    alias ) )
+                delete.append( alias )
+        self.accounts[ account ].aliases.difference_update( delete )
         if not self.accounts[ account ].aliases:
             return
         Logging( 'ldap' ).debug( 'Aliases pour le compte '

@@ -129,15 +129,29 @@ class AliasesMap:
         :param accounts: les comptes à traiter
         """
         self.aliases_ = {}
-        self.reverseAliases_ = {}
+        self.reverse_aliases_ = {}
         mail_domain = '@{}'.format( cfg.get( 'ldap' , 'mail-domain' ) )
+
+        # Recherche les transfers d'aliases
+        account_map = { eppn : eppn for eppn in accounts }
+        for eppn in accounts:
+            account = accounts[ eppn ]
+            if account.ldapMail is None:
+                continue
+            for ma in account.ldapMail:
+                if ma != eppn and ma in accounts:
+                    account_map[ ma ] = eppn
+                    self.add_alias( eppn , ma )
+
         # Initialisation
         for eppn in accounts:
             account = accounts[ eppn ]
-            if ( account.ldapMail is None or account.ldapMail == eppn
-                    or not account.ldapMail.endswith( mail_domain ) ):
+            if account.ldapMail is None:
                 continue
-            self.add_alias( eppn , account.ldapMail )
+            tgt_eppn = account_map[ eppn ]
+            for ma in account.ldapMail:
+                if ma != eppn and ma != tgt_eppn and ma.endswith( mail_domain ):
+                    self.add_alias( tgt_eppn , ma )
 
         # Charge les aliases supplémentaires
         extra_aliases = cfg.alias_commands( ).get_aliases( )
@@ -195,23 +209,23 @@ class AliasesMap:
                             alias , self.aliases_[ alias ] , target ) )
 
         # On ajoute le nouvel alias et son mapping inverse
-        if target not in self.reverseAliases_:
-            self.reverseAliases_[ target ] = set( )
+        if target not in self.reverse_aliases_:
+            self.reverse_aliases_[ target ] = set( )
         self.aliases_[ alias ] = target
-        self.reverseAliases_[ target ].add( alias )
+        self.reverse_aliases_[ target ].add( alias )
 
         # Si le nouvel alias figure dans les mapping inverse, on remplace tous
         # les alias pointant vers celui-ci par un alias pointant vers la
         # nouvelle cible.
-        if alias in self.reverseAliases_:
-            for old_alias in self.reverseAliases_[ alias ]:
+        if alias in self.reverse_aliases_:
+            for old_alias in self.reverse_aliases_[ alias ]:
                 if old_alias == target:
                     self.aliases_.pop( old_alias )
                 else:
                     self.aliases_[ old_alias ] = target
-            self.reverseAliases_[ target ].update(
-                    self.reverseAliases_[ alias ] )
-            self.reverseAliases_.pop( alias )
+            self.reverse_aliases_[ target ].update(
+                    self.reverse_aliases_[ alias ] )
+            self.reverse_aliases_.pop( alias )
 
     def get_aliased_accounts( self ):
         """
@@ -220,7 +234,7 @@ class AliasesMap:
 
         :return: l'ensemble des adresses cible
         """
-        return set( self.reverseAliases_.keys( ) )
+        return set( self.reverse_aliases_.keys( ) )
 
     def getAllAliases( self ):
         """
@@ -249,8 +263,8 @@ class AliasesMap:
         :param str address: l'adresse du compte
         :return: l'ensemble des aliases définis
         """
-        if address not in self.reverseAliases_:
+        if address not in self.reverse_aliases_:
             if address in self.aliases_:
                 raise AliasError( '{}: est un alias'.format( address ) )
             return set()
-        return set( self.reverseAliases_[ address ] )
+        return set( self.reverse_aliases_[ address ] )

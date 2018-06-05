@@ -173,7 +173,6 @@ class ProcessSkeleton:
         """
         ldap_data = LDAPData( self.cfg , self.ldap_query )
         aliases = AliasesMap( self.cfg , ldap_data.accounts )
-        ldap_data.remove_alias_accounts( )
         ldap_data.set_aliases( aliases )
         ldap_data.fix_mail_domain( self.cfg )
         ldap_data.clear_empty_sets( )

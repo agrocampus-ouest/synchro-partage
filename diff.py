@@ -155,18 +155,19 @@ class DiffItem:
             'ldap' : 3 if v[ 'ldap' ] == DiffItem.Unknown else 0 ,
         }
 
+        from aolpsync.utils import multivalued_check_equals as mce
         if v[ 'db' ] == DiffItem.Unknown:
             groups[ 'db' ] = 3
-        elif v[ 'ldap' ] == v[ 'db' ]:
+        elif mce( v[ 'ldap' ] , v[ 'db' ] ):
             groups[ 'db' ] = 0
         else:
             groups[ 'db' ] = 1
 
         if v[ 'bss' ] == DiffItem.Unknown:
             groups[ 'bss' ] = 3
-        elif v[ 'bss' ] == v[ 'ldap' ]:
+        elif mce( v[ 'bss' ] , v[ 'ldap' ] ):
             groups[ 'bss' ] = groups[ 'ldap' ]
-        elif v[ 'bss' ] == v[ 'db' ]:
+        elif mce( v[ 'bss' ] , v[ 'db' ] ):
             groups[ 'bss' ] = groups[ 'db' ]
         else:
             groups[ 'bss' ] = 2
@@ -234,10 +235,14 @@ class DiffViewer( ProcessSkeleton ):
 
     def preinit( self ):
         DiffItem.DOMAIN = '@{}'.format( self.cfg.get( 'bss' , 'domain' ) )
+
         eppn_domain = self.cfg.get( 'ldap' , 'eppn-domain' )
-        self.check_accounts = set((
-            eppn if '@' in eppn else ( '{}@{}'.format( eppn, eppn_domain ) )
-                for eppn in self.arguments.eppns ))
+        self.check_accounts = []
+        for eppn in self.arguments.eppns:
+            if '@' not in eppn:
+                eppn = '{}@{}'.format( eppn, eppn_domain )
+            if eppn not in self.check_accounts:
+                self.check_accounts.append( eppn )
         Logging( 'diff' ).debug( 'EPPNs concernés: {}'.format( ', '.join(
                     self.check_accounts ) ) )
 

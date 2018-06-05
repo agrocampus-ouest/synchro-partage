@@ -63,6 +63,27 @@ def json_dump( data ):
 #-------------------------------------------------------------------------------
 
 
+def multivalued_check_equals( a , b ):
+    # Valeurs égales => identique
+    if a == b: return True
+    # On ne poursuit que si l'une des deux valeurs est un ensemble ou une liste
+    ( ais , bis ) = ( ( isinstance( v , set ) or isinstance( v , list ) )
+            for v in ( a , b ) )
+    if ( ais and bis ) or not ( ais or bis ): return False
+    # On inverse les valeurs si nécessaire pour que a soit l'ensemble et b la
+    # valeur
+    if bis: ( a , b ) = ( b , a )
+    # Valeur non définie vs ensemble vide => identique
+    if b is None and not a: return True
+    # Valeur vs ensemble d'un élement contenant la valeur => identique
+    if b is not None and len( a ) == 1 and b in a: return True
+    # Sinon différent
+    return False
+
+
+#-------------------------------------------------------------------------------
+
+
 class BSSQuery:
     """
     Une classe qui peut être passée comme paramètre d'action à BSSAction afin
