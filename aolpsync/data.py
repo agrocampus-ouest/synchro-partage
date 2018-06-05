@@ -567,7 +567,7 @@ class LDAPData:
                                 'Compte LDAP {}: redirection depuis {} vers '
                                 + '{} ignorée'
                             ).format( str( entry.uid ) , a.mail , ma ) )
-                        remove.add( ma )
+                        remove.append( ma )
                     a.ldapMail.difference_update( remove )
                     if not a.ldapMail:
                         Logging( 'ldap' ).info(
