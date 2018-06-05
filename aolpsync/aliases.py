@@ -2,6 +2,16 @@ from .configuration import Config
 from .logging import Logging
 
 
+class AliasError( Exception ):
+    """
+    Exception utilisée pour représenter un problème avec les aliases.
+    """
+    pass
+
+
+#-------------------------------------------------------------------------------
+
+
 class AliasCommands:
     """
     Support de commandes permettant la récupération de listes d'aliases

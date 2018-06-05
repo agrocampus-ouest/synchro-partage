@@ -1,12 +1,6 @@
 from .logging import Logging
 
 
-class AliasError( Exception ):
-    """
-    Exception utilisée pour représenter un problème avec les aliases.
-    """
-    pass
-
 class AttributeDefError( Exception ):
     """
     Exception utilisée pour représenter un problème de définition d'attribut
