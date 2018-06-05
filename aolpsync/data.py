@@ -491,7 +491,7 @@ class SyncAccount:
 
 class LDAPData:
 
-    def __init__( self , cfg ):
+    def __init__( self , cfg , query = "" ):
         """
         Charge les données en provenance du serveur LDAP, et permet leur
         modification ultérieure pour adapter les données des comptes en fonction
@@ -536,7 +536,7 @@ class LDAPData:
                 obj_person = get_def_( cfg.get_list( 'ldap-people-classes' ) )
 
                 from ldap3 import Reader
-                reader = Reader( ldap_conn , obj_person , people_dn )
+                reader = Reader( ldap_conn , obj_person , people_dn , query )
                 cursor = reader.search_paged( 10 , True )
                 all_uids = set( )
                 accounts = {}
@@ -613,7 +613,7 @@ class LDAPData:
                         if eppn in self.accounts:
                             self.accounts[ eppn ].add_group( g )
                             continue
-                        if uid in all_uids:
+                        if uid in all_uids or query:
                             continue
                         Logging( 'ldap' ).warning(
                                 'Groupe {} - utilisateur {} inconnu'.format( g ,
@@ -635,6 +635,8 @@ class LDAPData:
                     Logging( 'ldap' ).debug( 'Compte {} - CoS {}'.format(
                             a.eppn , a.cos ) )
 
+            if query:
+                Logging( 'ldap' ).debug( 'Filtre LDAP: {}'.format( query ) )
             self.groups = read_groups_( )
             ( all_uids , self.accounts ) = read_accounts_( )
             set_account_groups_( all_uids )

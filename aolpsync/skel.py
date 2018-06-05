@@ -167,8 +167,11 @@ class ProcessSkeleton:
         ôtés de la liste. Enfin, si le domaine BSS et le domaine mail sont
         différents (parce que l'on est sur le serveur de test, par exemple),
         corrige toutes les adresses.
+
+        Il est possible de limiter les entrées lues depuis l'annuaire ldap en
+        écrivant un filtre dans self.ldap_query pendant la préinitialisation.
         """
-        ldap_data = LDAPData( self.cfg )
+        ldap_data = LDAPData( self.cfg , self.ldap_query )
         aliases = AliasesMap( self.cfg , ldap_data.accounts )
         ldap_data.remove_alias_accounts( )
         ldap_data.set_aliases( aliases )
@@ -307,6 +310,7 @@ class ProcessSkeleton:
         Logging.FILE_NAME = opjoin( cd , 'partage-sync-logging.ini' )
 
         self.cfg = Config( self.get_cfg_overrides( ) )
+        self.ldap_query = ''
         self.preinit( )
 
         if require_bss:

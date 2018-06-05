@@ -241,6 +241,16 @@ class DiffViewer( ProcessSkeleton ):
         Logging( 'diff' ).debug( 'EPPNs concernés: {}'.format( ', '.join(
                     self.check_accounts ) ) )
 
+        suffix = '@' + eppn_domain
+        sl = -len( suffix )
+        uids = [ eppn[ :sl ]
+            for eppn in self.check_accounts
+                if eppn.endswith( suffix ) ]
+        self.ldap_query = '(|{}{})'.format(
+                ''.join( '(eduPersonPrincipalName={})'.format( eppn )
+                            for eppn in self.check_accounts ) ,
+                ''.join( '(uid={})'.format( uid ) for uid in uids ) )
+
     #---------------------------------------------------------------------------
 
     def read_bss_account( self , eppn , bss_domain ):
