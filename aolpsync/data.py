@@ -442,10 +442,10 @@ class SyncAccount:
     def compare_( self , other , attributes ):
         from .utils import multivalued_check_equals as mce
         def eq_check_( attr ):
-            va = getattr( self , a , None )
-            vb = getattr( other , b , None )
+            va = getattr( self , attr , None )
+            vb = getattr( other , attr , None )
             return mce( va , vb )
-        return False not in ( eq_check_( attr ) for a in attributes )
+        return False not in ( eq_check_( a ) for a in attributes )
 
     def __eq__( self , other ):
         if type( other ) != type( self ):
@@ -463,7 +463,7 @@ class SyncAccount:
         :param SyncAccount other: l'instance avec laquelle on doit comparer
         :return: True si des différences existent, False dans le cas contraire
         """
-        return self.compare_( other , SyncAccount.DETAILS )
+        return not self.compare_( other , SyncAccount.DETAILS )
 
     def bss_equals( self , other ):
         """
@@ -475,10 +475,11 @@ class SyncAccount:
         :return: True si les deux comptes sont équivalents, False dans le \
                 cas contraire
         """
-        return ( self.mail == other.mail
+        from .utils import multivalued_check_equals as mce
+        return ( mce( self.mail , other.mail )
                 and self.markedForDeletion == other.markedForDeletion
                 and not self.details_differ( other )
-                and self.aliases == other.aliases )
+                and mce( self.aliases , other.aliases ) )
 
     def is_predeleted( self ):
         return self.markedForDeletion is not None
