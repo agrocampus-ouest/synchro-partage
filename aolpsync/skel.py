@@ -308,25 +308,36 @@ class ProcessSkeleton:
         Config.FILE_NAME = opjoin( cd , 'partage-sync.ini' )
         Logging.FILE_NAME = opjoin( cd , 'partage-sync-logging.ini' )
 
+        # Stockage des éléments requis
+        self.requires = {
+            'bss'  : require_bss ,
+            'cos'  : require_cos ,
+            'ldap' : require_ldap ,
+        }
+
+        # Lecture de la configuration, pré-initialisation
         self.cfg = Config( self.get_cfg_overrides( ) )
         self.ldap_query = ''
         self.preinit( )
 
-        if require_bss:
+        # Connexion au BSS et chargement des CoS
+        if self.requires[ 'bss' ]:
             self.cfg.bss_connection( )
-            if require_cos:
+            if self.requires[ 'cos' ]:
                 self.load_cos( )
                 self.cfg.check_coses( self.coses )
         else:
-            assert not require_cos
+            assert not self.requires[ 'cos' ]
 
-        if require_ldap:
+        # Connexion au LDAP et chargement des donnée.
+        if self.requires[ 'ldap' ]:
             self.load_from_ldap( )
 
         if self.cfg.has_flag( 'bss' , 'simulate' ):
             Logging( ).warn( 'Mode simulation activé' )
             BSSAction.SIMULATE = True
 
+        # Exécution
         self.init( )
         with self.cfg.lmdb_env( ) as db:
             self.db = db
