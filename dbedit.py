@@ -44,6 +44,10 @@ class DbEditor( ProcessSkeleton ):
                 require_cos = False )
 
     def preinit( self ):
+        """
+        Vérifie les arguments et demande les connexions nécessaires (par exemple
+        connexion LDAP si l'on veut copier l'enregistrement LDAP).
+        """
         SyncAccount( self.cfg ) # On s'assure que la liste des champs est prête
 
         eppn = self.arguments.eppn
@@ -96,6 +100,13 @@ class DbEditor( ProcessSkeleton ):
     #---------------------------------------------------------------------------
 
     def get_from_bss( self ):
+        """
+        Lit les données d'un compte depuis l'API Partage.
+
+        :return: le compte lu depuis Partage
+        :raise FatalError: la connexion à Partage a échoué, ou le compte ne \
+                figure pas sur le serveur
+        """
         bss_domain = self.cfg.get( 'bss' , 'domain' )
         eppn = self.target
         retr = BSSAction( BSSQuery( 'getAllAccounts' ) ,
@@ -128,12 +139,24 @@ class DbEditor( ProcessSkeleton ):
 
 
     def get_from_ldap( self ):
+        """
+        Lit les données d'un compte depuis l'annuaire LDAP
+
+        :return: le compte importé depuis l'annuaire
+        :raise FatalError: le compte n'existe pas dans l'annuaire
+        """
         if self.target in self.ldap_accounts:
             return self.ldap_accounts[ self.target ]
         raise FatalError( 'Compte {} non trouvé dans le LDAP'.format(
                 self.target ) )
 
     def get_values_ext( self ):
+        """
+        Récupère les données depuis une source externe (API Partage ou annuaire
+        LDAP).
+
+        :return: la ou les valeurs correspondant au champ
+        """
         if self.copy_from == 'ldap':
             account = self.get_from_ldap( )
         else:
@@ -142,6 +165,12 @@ class DbEditor( ProcessSkeleton ):
         return getattr( account , self.field )
 
     def get_values( self ):
+        """
+        Récupère les nouvelles valeurs du champ à modifier, soit depuis la ligne
+        de commande, soit depuis une source de données externe.
+
+        :return: la ou les valeurs
+        """
         if self.copy_from is not None:
             values = self.get_values_ext( )
         else:
@@ -154,6 +183,13 @@ class DbEditor( ProcessSkeleton ):
         return values
 
     def get_print_value( self , v ):
+        """
+        Génère la chaîne à afficher pour prévisualiser les modifications à
+        effectuer.
+
+        :param v: la ou les valeurs devant être affichée(s)
+        :return: la chaîne d'affichage
+        """
         if v is None:
             return '(pas de valeur)'
         elif not isinstance( v , str ):
@@ -161,13 +197,19 @@ class DbEditor( ProcessSkeleton ):
         return '\n  {}'.format( v )
 
     def confirm_change( self ):
+        """
+        Affiche la liste des modifications et demande confirmation à
+        l'utilisateur. Si l'argument '-f' a été passé, les valeurs seront
+        affichées mais aucune confirmation ne sera demandée.
+
+        :return: True si la mise à jour doit être effectuée, False si elle \
+                doit être annulée.
+        """
         from aolpsync.utils import multivalued_check_equals as mce
         initial = getattr( self.db_accounts[ self.target ] , self.field )
         if mce( self.values , initial ):
             print( 'Aucune modification à effectuer' )
             return False
-        if self.arguments.force:
-            return True
 
         print( )
         print( 'Modification du compte {}, champ {}'.format( self.target ,
@@ -179,6 +221,9 @@ class DbEditor( ProcessSkeleton ):
                 self.values ) ) )
         print( )
 
+        if self.arguments.force:
+            return True
+
         ok = input( 'Effectuer cette modification [o/N] ? ' )
         ok = ok.strip( ).lower( ) == 'o'
         if not ok:
@@ -186,6 +231,9 @@ class DbEditor( ProcessSkeleton ):
         return ok
 
     def write_log( self ):
+        """
+        Écrit l'entrée de journal correspondant aux modifications demandées.
+        """
         Logging( 'edit' ).info( 'Modification du compte {}, champ {}'.format(
                 self.target , self.field ) )
         Logging( 'edit' ).info( 'Valeur initiale: {}'.format(
@@ -195,6 +243,10 @@ class DbEditor( ProcessSkeleton ):
                 repr( self.values ) ) )
 
     def process( self ):
+        """
+        Récupère les nouvelles valeurs, demande éventuellement confirmation,
+        puis effectue les modifications sur l'enregistrement en base.
+        """
         if self.target not in self.db_accounts:
             raise FatalError( 'Compte {} absent de la base'.format(
                     self.target ) )
