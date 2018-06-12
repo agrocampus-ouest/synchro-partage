@@ -316,8 +316,10 @@ class ProcessSkeleton:
         }
 
         # Lecture de la configuration, pré-initialisation
+        from .sqldb import init as sql_init
         self.cfg = Config( self.get_cfg_overrides( ) )
         self.ldap_query = ''
+        sql_init( self.cfg )
         self.preinit( )
 
         # Connexion au BSS et chargement des CoS

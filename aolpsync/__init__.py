@@ -7,3 +7,4 @@ from .rules import RuleError , Rule
 from .skel import ProcessSkeleton
 from .utils import FatalError , BSSAction , BSSQuery
 from . import utils as aolputils
+from . import sqldb as aolpsql
