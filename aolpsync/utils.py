@@ -1,3 +1,4 @@
+from .logging import Logging
 import json
 
 class FatalError( Exception ):
@@ -183,11 +184,13 @@ class Zimbra:
         self.fake_it_ = cfg.has_flag( 'bss' , 'simulate' )
         self.user_ = None
         self.token_ = None
-        self.comm_ = pythonzimbra.communication.Communication( self.url_ )
+        from pythonzimbra.communication import Communication
+        self.comm_ = Communication( self.url_ )
 
     def terminate( self ):
         if self.user_ is None:
             return
+        Logging( 'zimbra' ).debug( 'Déconnexion de {}'.format( self.user_ ) )
         self.send_request_( 'Account' , 'EndSession' )
         self.user_ = None
         self.token_ = None
@@ -202,18 +205,25 @@ class Zimbra:
 
         from pythonzimbra.tools import auth
         from pythonzimbra.exceptions.auth import AuthenticationFailed
+        Logging( 'zimbra' ).debug( 'Connexion pour {}'.format( user_name ) )
         try:
             ttok = auth.authenticate(
                     self.url_ , user_name ,
                     self.dkey_ , raise_on_error = True )
         except AuthenticationFailed as e:
+            Logging( 'zimbra' ).error(
+                    'Échec de la connexion: {}'.format( str( e ) ) )
             raise ZimbraConnectionError( e ) #FIXME
+        Logging( 'zimbra' ).debug( 'Connexion réussie; jeton: {}'.format(
+                ttok ) )
 
         assert ttok is not None
         self.user_ = user_name
         self.token_ = ttok
 
     def get_folder( self , path = '/' , recursive = True ):
+        Logging( 'zimbra' ).debug( 'Récupération{} du dossier {}'.format(
+                ' récursive' if recursive else '' , path ) )
         ls = self.send_request_( 'Mail' , 'GetFolder' , {
                 'path' : path ,
                 'depth' : -1 if recursive else 0
@@ -222,6 +232,13 @@ class Zimbra:
 
     def create_folder( self , name , parent_id , folder_type ,
             color = None , url = None , flags = None , others = None ):
+        Logging( 'zimbra' ).debug(
+                'Création{} du dossier {}, parent {}, type {}'.format(
+                    ' simulée' if self.fake_it_ else '' ,
+                    name , parent_id , folder_type ) )
+
+        if self.fake_it_:
+            return {}
         data = {
             'name' : name ,
             'view' : folder_type ,
@@ -232,13 +249,19 @@ class Zimbra:
         if 'acl' not in data: data[ 'acl' ] = {}
         if color is not None: data[ 'rgb' ] = color
         if url is not None: data[ 'url' ] = url
-        if flags is not None: data[ 'flags' ] = flags
+        if flags is not None: data[ 'f' ] = flags
         return self.send_request_( 'Mail' , 'CreateFolder' , {
                 'folder' : data
             } )
 
     def move_folder( self , folder_id , to_id ):
-        return self.send_request( 'Mail' , 'FolderAction' , {
+        Logging( 'zimbra' ).debug(
+                'Déplacement{} du dossier #{} vers dossier #{}'.format(
+                    ' simulé' if self.fake_it_ else '' ,
+                    folder_id , to_id ) )
+        if self.fake_it_:
+            return {}
+        return self.send_request_( 'Mail' , 'FolderAction' , {
                 'action' : {
                     'op' : 'move' ,
                     'id' : folder_id ,
@@ -247,7 +270,13 @@ class Zimbra:
             } )
 
     def rename_folder( self , folder_id , name ):
-        return self.send_request( 'Mail' , 'FolderAction' , {
+        Logging( 'zimbra' ).debug(
+                'Renommage{} du dossier #{}; nouveau nom "{}"'.format(
+                    ' simulé' if self.fake_it_ else '' ,
+                    folder_id , name ) )
+        if self.fake_it_:
+            return {}
+        return self.send_request_( 'Mail' , 'FolderAction' , {
                 'action' : {
                     'op' : 'rename' ,
                     'id' : folder_id ,
@@ -257,14 +286,17 @@ class Zimbra:
 
     def send_request_( self , namespace , request , data = None ):
         assert self.token_ is not None
+        Logging( 'zimbra.request' ).debug(
+                'Requête {}.{}( {} )'.format(
+                    namespace , request , repr( data ) ) )
         if data is None:
             data = dict()
-        req = zimbra_comm.gen_request( token = self.token_ )
+        req = self.comm_.gen_request( token = self.token_ )
         req.add_request( request + 'Request' , data , 'urn:zimbra' + namespace )
-        response = zimbra_comm.send_request( req )
+        response = self.comm_.send_request( req )
         if response.is_fault( ):
             raise ZimbraRequestError( 'appel {}.{}: {} (code {})'.format(
                     namespace , request , response.get_fault_message( ) ,
-                    response.get_fault_code( ) )
+                    response.get_fault_code( ) ) )
         rv = response.get_response( )
         return rv[ request + 'Response' ]
