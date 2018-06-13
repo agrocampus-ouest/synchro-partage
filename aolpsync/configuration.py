@@ -158,7 +158,7 @@ class Config:
 
     #---------------------------------------------------------------------------
 
-    def get( self , section , value , default = None ):
+    def get( self , section , value , default = None , raise_missing = False ):
         """
         Lit une valeur depuis la configuration.
 
@@ -166,11 +166,25 @@ class Config:
         :param str value: le nom du paramètre de configuration
         :param default: la valeur par défaut à renvoyer si la valeur ne peut \
                 être trouvée
+        :param bool raise_missing: lève une exception si la valeur n'existe \
+                pas et qu'aucune valeur par défaut n'a été spécifiée
 
         :return: la valeur de l'entrée, ou la valeur par défaut
+
+        :raises FatalError: l'entrée de configuration demandée n'existe pas et \
+                le paramètre raise_missing est vrai.
         """
         if section not in self.cfg_:
-            return default
+            if raise_missing and default is None:
+                do_raise = True
+            v = default
+        elif not ( raise_missing and default is None ):
+            v = self.cfg_[ section ].get( value , default )
+        elif value in self.cfg_[ section ]:
+            v = self.cfg_[ section ][ value ]
+        else:
+            raise FatalError( ( 'Entrée de configuration {} absente dans la '
+                    + 'section {}' ).format( value , section ) )
         return self.cfg_[ section ].get( value , default )
 
     def has_flag( self , section , name ):
