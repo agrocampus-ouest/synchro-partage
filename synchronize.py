@@ -85,6 +85,7 @@ class Synchronizer( ProcessSkeleton ):
             Logging( ).error( 'Impossible de créer le compte {}'.format(
                     acc.mail ) )
             return
+        self.new_accounts.add( eppn )
         # On l'ajoute dans la base, sans ses aliases
         aliases = acc.aliases
         acc.aliases = set()
@@ -271,6 +272,7 @@ class Synchronizer( ProcessSkeleton ):
 
         # Créations de comptes
         new_accounts = sla - sdba
+        self.new_accounts = set( )
         Logging( ).info( '{} nouveau(x) compte(s)'.format(
                 len( new_accounts ) ) )
         for eppn in new_accounts:
@@ -302,6 +304,18 @@ class Synchronizer( ProcessSkeleton ):
                 len( deleted ) ) )
         for eppn in deleted:
             self.pre_delete( eppn )
+
+    def postprocess( self ):
+        """
+        Si des comptes ont été créés sur le serveur, tente d'ajouter les emplois
+        du temps correspondants.
+        """
+        if not self.new_accounts or not self.cfg.has_section( 'calendars' ):
+            return
+        Logging( 'sync' ).info(
+                'Synchronisation des calendriers pour les nouveaux comptes' )
+        CalendarSync( self.cfg ).synchronize( self.db_accounts ,
+                self.new_accounts )
 
 
 #-------------------------------------------------------------------------------
