@@ -231,6 +231,16 @@ class Config:
             return dict()
         raise FatalError( 'Section {} non trouvée'.format( section ) )
 
+    def has_section( self , section ):
+        """
+        Vérifie si une section est présente dans le fichier de configuration.
+
+        :param str section: le nom de la section
+
+        :return: True si la section existe, False dans le cas contraire
+        """
+        return section in self.cfg_
+
     #---------------------------------------------------------------------------
 
     def ldap_server( self ):
