@@ -115,8 +115,11 @@ eppn-domain=agrocampus-ouest.fr
 
 
 ################################################################################
-# Configuration de la base de données
+# Configuration des bases de données
 ################################################################################
+
+#-------------------------------------------------------------------------------
+# Base de données de synchronisation
 
 [db]
 
@@ -125,6 +128,20 @@ path=/var/lib/partage-sync
 
 # Taille maximale en mémoire. Par défaut 200Mo.
 #map-limit=209715200
+
+#-------------------------------------------------------------------------------
+# Base(s) de données SQL supplémentaires
+
+# Chaque base de données SQL doit figurer dans une section nommée "sqldb-$titre"
+[sqldb-celcat]
+# Le module Python à utiliser pour se connecter à la base (OBLIGATOIRE)
+python-module=pymssql
+# Les paramètres à passer à la méthode de connexion. La liste des paramètres est
+# spécifique au module utilisé.
+server=celcat-prod
+user=CELCAT-PROD\user
+password=Pot de masse
+
 
 
 ################################################################################
@@ -142,6 +159,11 @@ domain=test-partage.agrocampus-ouest.fr
 
 # Jeton d'authentification (OBLIGATOIRE)
 token=c0ffee15600da150deadbeef15b4d34567892345678912345678912345678900
+
+# Adresse de l'API SOAP de Zimbra. Si cette adresse n'est pas indiquée, la
+# valeur par défaut (https://webmail.partage.renater.fr/service/soap) sera
+# utilisée. À ne modifier que si Partage déplace ce point d'accès.
+# zimbra-soap=https://webmail.partage.renater.fr/service/soap
 
 # Nom de la classe de service par défaut (OBLIGATOIRE)
 default-cos=etu_sa_agrocampus-ouest
@@ -228,6 +250,36 @@ report-path=/var/www/aolpsync-reports
 
 # URL de base à laquelle les rapports seront accessibles. OBLIGATOIRE.
 report-url=https://partage-sync.agrocampus-ouest.fr/consolidation/
+
+
+################################################################################
+# Ajout automatique de calendriers
+################################################################################
+
+# Si la section calendars n'est pas présente, la synchronisation des calendriers
+# ne sera pas effectuée.
+[calendars]
+
+# Base de données SQL source (OBLIGATOIRE)
+# Fait référence à une base de données SQL définie au dessus.
+source=celcat
+
+# Requête à exécuter dans la base de données (OBLIGATOIRE)
+# Doit renvoyer deux valeurs par entrée: un mail et une URL
+query=SELECT [email] , 'webcal://edt.agrocampus-ouest.fr/ical/ical/' + [url_postfix] + '/schedule.ics' FROM [ICALFEED].[dbo].[VUSER]
+
+# Nom de base des calendriers (OBLIGATOIRE)
+# Le nom en question sera utilisé par défaut, mais un nombre y sera ajouté s'il
+# n'est pas disponible.
+folder-name=Emploi du temps
+
+# Couleur à utiliser - le code RGB de la couleur du dossier. La couleur par
+# défaut sera utilisée si ce paramètre n'est pas présent.
+# folder-color=ff00ff
+
+# Drapeau d'inclusion dans la recherche de disponibilités. Si le drapeau n'est
+# pas présent, le calendrier ne sera pas inclus dans la recherche.
+# blocking-events
 
 
 # vim: syntax=cfg
