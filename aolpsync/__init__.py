@@ -1,4 +1,5 @@
 from .aliases import AliasError , AliasCommands , AliasesMap
+from .calendar import CalendarSync
 from .configuration import Config
 from .data import AttributeDefError , AccountStateError
 from .data import SyncAccount , LDAPData
