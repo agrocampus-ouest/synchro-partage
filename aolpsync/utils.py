@@ -159,3 +159,108 @@ class BSSAction:
         :return: les données renvoyées (ou None si l'appel a échoué)
         """
         return self.data_
+
+
+#-------------------------------------------------------------------------------
+
+class ZimbraError( Exception ):
+    pass
+
+class ZimbraConnectionError( ZimbraError ):
+    pass
+
+class ZimbraRequestError( ZimbraError):
+    pass
+
+
+class Zimbra:
+
+    def __init__( self , cfg ):
+        self.url_ = cfg.get( 'bss' , 'zimbra-url' ,
+                'https://webmail.partage.renater.fr/service/soap' )
+        self.domain_ = cfg.get( 'bss' , 'domain' )
+        self.dkey_ = cfg.get( 'bss' , 'token' )
+        self.fake_it_ = cfg.has_flag( 'bss' , 'simulate' )
+        self.user_ = None
+        self.token_ = None
+        self.comm_ = pythonzimbra.communication.Communication( self.url_ )
+
+    def terminate( self ):
+        if self.user_ is None:
+            return
+        self.send_request_( 'Account' , 'EndSession' )
+        self.user_ = None
+        self.token_ = None
+
+    def set_user( self , user_name ):
+        if self.user_ is not None and self.user_ == user_name:
+            return
+        self.terminate( ) # ...Yes dear, you can self-terminate.
+
+        from pythonzimbra.tools import auth
+        from pythonzimbra.exceptions.auth import AuthenticationFailed
+        try:
+            ttok = auth.authenticate(
+                    self.url_ , '{}@{}'.format( user_name , self.domain_ ) ,
+                    self.dkey_ , raise_on_error = True )
+        except AuthenticationFailed as e:
+            raise ZimbraConnectionError( e ) #FIXME
+
+        assert ttok is not None
+        self.user_ = user_name
+        self.token_ = ttok
+
+    def get_folder( self , path = '/' , recursive = True ):
+        return self.send_request_( 'Mail' , 'GetFolder' , {
+                'path' : path ,
+                'depth' : -1 if recursive else 0
+            } )
+
+    def create_folder( self , name , parent_id , folder_type ,
+            color = None , url = None , flags = None , others = None ):
+        data = {
+            'name' : name ,
+            'view' : folder_type ,
+            'l' : parent_id ,
+            'fie' : '1' ,
+        }
+        if others is not None: data.update( others )
+        if 'acl' not in data: data[ 'acl' ] = {}
+        if color is not None: data[ 'rgb' ] = color
+        if url is not None: data[ 'url' ] = url
+        if flags is not None: data[ 'flags' ] = flags
+        return self.send_request_( 'Mail' , 'CreateFolder' , {
+                'folder' : data
+            } )
+
+    def move_folder( self , folder_id , to_id ):
+        return self.send_request( 'Mail' , 'FolderAction' , {
+                'action' : {
+                    'op' : 'move' ,
+                    'id' : folder_id ,
+                    'l' : to_id ,
+                }
+            } )
+
+    def rename_folder( self , folder_id , name ):
+        return self.send_request( 'Mail' , 'FolderAction' , {
+                'action' : {
+                    'op' : 'rename' ,
+                    'id' : folder_id ,
+                    'name' : name ,
+                }
+            } )
+
+    def send_request_( self , namespace , request , data = None ):
+        assert self.token_ is not None
+        if data is None:
+            data = dict()
+        req = zimbra_comm.gen_request( token = self.token_ )
+        req.add_request( request + 'Request' , data , 'urn:zimbra' + namespace )
+        response = zimbra_comm.send_request( req )
+        if response.is_fault( ):
+            raise ZimbraRequestError( 'appel {}.{}: {} (code {})'.format(
+                    namespace , request , response.get_fault_message( ) ,
+                    response.get_fault_code( ) )
+        rv = response.get_response( )
+        return rv[ request + 'Response' ]
