@@ -28,8 +28,10 @@ class CalendarsSynchronizer( ProcessSkeleton ):
         pass
 
     def postprocess( self ):
-        calendars = CalendarSync( self.cfg )
-        calendars.synchronize( self.db_accounts )
+        """
+        Effectue la synchronisation des calendriers.
+        """
+        CalendarSync( self.cfg ).synchronize( self.db_accounts )
 
 #-------------------------------------------------------------------------------
 
