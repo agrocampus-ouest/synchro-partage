@@ -193,6 +193,9 @@ class Zimbra:
         self.token_ = None
 
     def set_user( self , user_name ):
+        if '@' not in user_name:
+            user_name = '{}@{}'.format( user_name , self.domain_ )
+
         if self.user_ is not None and self.user_ == user_name:
             return
         self.terminate( ) # ...Yes dear, you can self-terminate.
@@ -201,7 +204,7 @@ class Zimbra:
         from pythonzimbra.exceptions.auth import AuthenticationFailed
         try:
             ttok = auth.authenticate(
-                    self.url_ , '{}@{}'.format( user_name , self.domain_ ) ,
+                    self.url_ , user_name ,
                     self.dkey_ , raise_on_error = True )
         except AuthenticationFailed as e:
             raise ZimbraConnectionError( e ) #FIXME
@@ -211,10 +214,11 @@ class Zimbra:
         self.token_ = ttok
 
     def get_folder( self , path = '/' , recursive = True ):
-        return self.send_request_( 'Mail' , 'GetFolder' , {
+        ls = self.send_request_( 'Mail' , 'GetFolder' , {
                 'path' : path ,
                 'depth' : -1 if recursive else 0
             } )
+        return ls[ 'folder' ] if 'folder' in ls else None
 
     def create_folder( self , name , parent_id , folder_type ,
             color = None , url = None , flags = None , others = None ):
