@@ -165,18 +165,38 @@ class BSSAction:
 #-------------------------------------------------------------------------------
 
 class ZimbraError( Exception ):
+    """
+    Classe de base pour les exceptions en rapport avec l'API de Zimbra.
+    """
     pass
 
 class ZimbraConnectionError( ZimbraError ):
+    """
+    Erreur lors de l'authentification à un compte Zimbra ou lors de la
+    communication.
+    """
     pass
 
 class ZimbraRequestError( ZimbraError):
+    """
+    Erreur lors de l'exécution d'une requête API Zimbra.
+    """
     pass
 
 
+#-------------------------------------------------------------------------------
+
+
 class Zimbra:
+    """
+    Classe utilitaire pour l'accès à l'API de Zimbra.
+    """
 
     def __init__( self , cfg ):
+        """
+        Initialise l'accès à l'API en lisant les paramètres de connexion dans la
+        configuration et en créant l'instance de communication.
+        """
         self.url_ = cfg.get( 'bss' , 'zimbra-url' ,
                 'https://webmail.partage.renater.fr/service/soap' )
         self.domain_ = cfg.get( 'bss' , 'domain' )
@@ -188,6 +208,10 @@ class Zimbra:
         self.comm_ = Communication( self.url_ )
 
     def terminate( self ):
+        """
+        Termine la session actuelle, s'il y en a une, en envoyant une requête
+        'EndSession'.
+        """
         if self.user_ is None:
             return
         Logging( 'zimbra' ).debug( 'Déconnexion de {}'.format( self.user_ ) )
@@ -196,6 +220,14 @@ class Zimbra:
         self.token_ = None
 
     def set_user( self , user_name ):
+        """
+        Tente de se connecter à l'API Zimbra avec un utilisateur donné. Si le
+        nom d'utilisateur n'inclut pas un domaine, il sera rajouté.
+
+        :param str user_name: le nom d'utilisateur
+
+        :raises ZimbraError: une erreur de communication s'est produite
+        """
         if '@' not in user_name:
             user_name = '{}@{}'.format( user_name , self.domain_ )
 
@@ -222,6 +254,18 @@ class Zimbra:
         self.token_ = ttok
 
     def get_folder( self , path = '/' , recursive = True ):
+        """
+        Lit les informations d'un dossier (au sens Zimbra du terme) et
+        éventuellement de ses sous-dossiers.
+
+        :param str path: le chemin absolu du dossier sur lequel on veut \
+                des informations
+        :param bool recursive: les informations des sous-dossiers seront \
+                également lues si ce paramètre est True
+
+        :raises ZimbraError: une erreur de communication ou de requête \
+                s'est produite
+        """
         Logging( 'zimbra' ).debug( 'Récupération{} du dossier {}'.format(
                 ' récursive' if recursive else '' , path ) )
         ls = self.send_request_( 'Mail' , 'GetFolder' , {
@@ -232,6 +276,24 @@ class Zimbra:
 
     def create_folder( self , name , parent_id , folder_type ,
             color = None , url = None , flags = None , others = None ):
+        """
+        Demande la création d'un dossier. Si le mode simulé est activé, l'appel
+        ne sera pas effectué.
+
+        :param str name: le nom du dossier à créer
+        :param parent_id: l'identifiant du dossier parent
+        :param str folder_type: le type de dossier à créer (conversation, \
+                message, contact, appointment, task, wiki, document)
+        :param str color: la couleur, sous la forme d'un code RGB hexadécimal \
+                ('#RRGGBB')
+        :param str url: l'URL de synchronisation, s'il y en a une
+        :param str flags: les drapeaux Zimbra du dossier
+        :param dict others: un dictionnaire contenant des valeurs \
+                supplémentaires à associer au dossier
+
+        :raises ZimbraError: une erreur de communication ou de requête \
+                s'est produite
+        """
         Logging( 'zimbra' ).debug(
                 'Création{} du dossier {}, parent {}, type {}'.format(
                     ' simulée' if self.fake_it_ else '' ,
@@ -255,6 +317,16 @@ class Zimbra:
             } )
 
     def move_folder( self , folder_id , to_id ):
+        """
+        Demande le déplacement d'un dossier. Si le mode simulé est activé,
+        l'appel ne sera pas effectué.
+
+        :param folder_id: l'identifiant du dossier à déplacer
+        :param to_id: l'identifiant du nouveau dossier parent
+
+        :raises ZimbraError: une erreur de communication ou de requête \
+                s'est produite
+        """
         Logging( 'zimbra' ).debug(
                 'Déplacement{} du dossier #{} vers dossier #{}'.format(
                     ' simulé' if self.fake_it_ else '' ,
@@ -270,6 +342,16 @@ class Zimbra:
             } )
 
     def rename_folder( self , folder_id , name ):
+        """
+        Demande à l'API de renommer un dossier. Si le mode simulé est activé,
+        l'appel ne sera pas effectué.
+
+        :param folder_id: l'identifiant du dossier à renommer
+        :param str name: le nouveau nom du dossier
+
+        :raises ZimbraError: une erreur de communication ou de requête \
+                s'est produite
+        """
         Logging( 'zimbra' ).debug(
                 'Renommage{} du dossier #{}; nouveau nom "{}"'.format(
                     ' simulé' if self.fake_it_ else '' ,
@@ -285,6 +367,17 @@ class Zimbra:
             } )
 
     def send_request_( self , namespace , request , data = None ):
+        """
+        Envoie une requête au serveur Zimbra
+
+        :param str namespace: l'espace de nommage de l'appel, par exemple Mail
+        :param str request: le nom de la requête, par exemple GetFolder
+
+        :return: la réponse renvoyée par le serveur
+
+        :raises ZimbraRequestError: une erreur de communication ou de requête \
+                s'est produite
+        """
         assert self.token_ is not None
         Logging( 'zimbra.request' ).debug(
                 'Requête {}.{}( {} )'.format(
