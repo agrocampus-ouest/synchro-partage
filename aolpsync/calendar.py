@@ -3,8 +3,17 @@ from .utils import Zimbra , ZimbraError
 
 
 class CalendarSync:
+    """
+    Classe permettant d'ajouter les agendas correspondant aux emplois du temps.
+    """
 
     def __init__( self , cfg ):
+        """
+        Lit et vérifie la configuration. Si elle ne contient pas de section
+        "[calendars]", l'instance sera désactivée.
+
+        :param cfg: la configuration
+        """
         self.enabled = cfg.has_section( 'calendars' )
         if not self.enabled: return
         self.source_db_ = cfg.get( 'calendars' , 'source' ,
@@ -30,6 +39,12 @@ class CalendarSync:
         self.zimbra_ = Zimbra( cfg )
 
     def synchronize( self , accounts , sync_set = None ):
+        """
+        Effectue la synchronisation des emplois du temps.
+
+        :param accounts: la liste des comptes, sous la forme d'un dictionnaire \
+                associant les instances SyncAccount aux EPPN
+        """
         if not self.enabled: return
 
         address_map = self.get_address_map_( accounts )
@@ -42,8 +57,9 @@ class CalendarSync:
 
         # Pour chaque compte, on ajoute l'emploi du temps
         for eppn in sync:
+            addr = accounts[ eppn ].mail
             try:
-                self.add_calendar_( eppn , calendars[ eppn ] )
+                self.add_calendar_( addr , calendars[ eppn ] )
             except ZimbraError as e:
                 Logging( 'cal' ).error( ( 'Erreur Zimbra lors de la mise à '
                         + 'jour du calendrier pour {}: {}' ).format(
@@ -52,13 +68,23 @@ class CalendarSync:
 
 
     def get_address_map_( self , accounts ):
+        """
+        Génère un dictionnaire associant toutes les adresses mail connues aux
+        EPPN des utilisateurs correspondants. Les comptes pré-supprimés seront
+        ignorés.
+
+        :param accounts: la liste des comptes, sous la forme d'un dictionnaire \
+                associant les instances SyncAccount aux EPPN
+
+        :return: le dictionnaire des adresses associées à leurs EPPN
+        """
         # On génère les correspondances comptes / adresses
         address_map = dict( )
         for eppn in accounts:
             account = accounts[ eppn ]
             if account.markedForDeletion is not None:
                 continue
-            address_map[ eppn ] = eppn
+            address_map[ account.mail ] = eppn
             if not account.aliases:
                 continue
             if isinstance( account.aliases , str ):
@@ -69,6 +95,14 @@ class CalendarSync:
         return address_map
 
     def get_calendars_( self , address_map ):
+        """
+        Lit la liste des calendriers depuis la base de données source.
+
+        :param address_map: un dictionnaire associant à chaque adresse connue \
+                l'EPPN d'un utilisateur
+
+        :return: un dictionnaire associant à chaque EPPN une URL de calendrier
+        """
         from .sqldb import query as sql_query
         calendars_list = sql_query( self.source_db_ , self.source_query_ )
         calendars = dict( )
@@ -89,15 +123,23 @@ class CalendarSync:
             calendars[ eppn ] = url
         return calendars
 
-    def add_calendar_( self , eppn , url ):
-        self.zimbra_.set_user( self.address_fixer_( eppn ) )
+    def add_calendar_( self , addr , url ):
+        """
+        Vérifie si l'emploi du temps doit être ajouté au compte d'un
+        utilisateur; s'il n'existe pas, il sera créé. S'il est présent mais
+        uniquement dans la poubelle, il en sera extrait.
+
+        :param addr: l'adresse mail du compte
+        :param url: l'URL du calendrier
+        """
+        self.zimbra_.set_user( addr )
         root_folder = self.zimbra_.get_folder( )
         found = self.find_calendar_( root_folder , url )
 
         if not found:
             # Aucune correspondance -> on crée
             Logging( 'cal' ).info( 'Création du calendrier pour {}'.format(
-                    eppn ) )
+                    addr ) )
             n = self.gen_calendar_name_( root_folder )
             f = 'i#' + ( '' if self.blocking_ else 'b' )
             self.zimbra_.create_folder( name = n ,
@@ -115,7 +157,7 @@ class CalendarSync:
 
         # Le calendrier est à la poubelle, on le restaure
         Logging( 'cal' ).info( 'Calendrier pour {}: dans la poubelle'.format(
-                eppn ) )
+                addr ) )
         ( restore , *junk ) = found.keys( )
         f_data = found[ restore ][ 1 ]
         n = self.gen_calendar_name_( root_folder )
@@ -124,8 +166,23 @@ class CalendarSync:
         self.zimbra_.move_folder( f_data[ 'id' ] , root_folder[ 'id' ] )
 
     def gen_calendar_name_( self , root ):
+        """
+        Génère le nom du calendrier à créer, en vérifiant si le nom existe déjà
+        et en y ajoutant un nombre en suffixe si c'est le cas.
+
+        :param root: le dossier racine de l'utilisateur
+        :return: le nom à utiliser pour le dossier
+        """
 
         def has_subfolder_( folder , sub_name ):
+            """
+            Vérifie si un dossier contient un sous-dossier avec un certain nom.
+
+            :param folder: les données du dossier parent
+            :param sub_name: le nom à vérifier
+
+            :return: True si un sous-dossier portant le nom spécifié existe
+            """
             return 'folder' in folder and sub_name in (
                     f[ 'name' ] for f in folder[ 'folder' ] )
 
@@ -139,6 +196,21 @@ class CalendarSync:
             x += 1
 
     def find_calendar_( self , folder , url , in_trash = False , v = None ):
+        """
+        Trouve le ou les exemplaires d'un emploi du temps dans les dossiers d'un
+        utilisateur.
+
+        :param folder: le dossier dans lequel chercher
+        :param url: l'URL à chercher
+        :param in_trash: les dossiers en cours de parcours font-ils partie \
+                de la poubelle? (utilisation interne lors de la récursion)
+        :param v: le dictionnaire des dossiers trouvés (utilisation interne \
+                lors de la récursion)
+
+        :return: un dictionnaire associant aux chemins absolus des comptes \
+                trouvés un tuple contenant un booléen qui indique si le \
+                dossier trouvé est dans la poubelle, et les données du dossier
+        """
         if v is None:
             v = dict( )
         if 'url' in folder and folder[ 'url' ] == url:
