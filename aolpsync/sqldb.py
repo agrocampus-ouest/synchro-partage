@@ -1,4 +1,5 @@
 from .logging import Logging
+from .utils import FatalError
 
 
 #-------------------------------------------------------------------------------
