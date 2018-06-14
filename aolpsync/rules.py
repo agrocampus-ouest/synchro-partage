@@ -1,4 +1,4 @@
-from .data import SyncAccount
+from .account import SyncAccount
 from .logging import Logging
 
 class RuleError( Exception ):

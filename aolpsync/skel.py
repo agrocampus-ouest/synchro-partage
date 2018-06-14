@@ -1,8 +1,7 @@
 from .aliases import AliasesMap
 from .configuration import Config , CfgOverride
-from .data import SyncAccount
+from .account import SyncAccount , LDAPData
 from .logging import Logging
-from .data import LDAPData
 from .rules import Rule , RuleError
 from .utils import BSSAction , FatalError
 

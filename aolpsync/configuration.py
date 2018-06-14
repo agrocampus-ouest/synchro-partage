@@ -1,5 +1,5 @@
 from .logging import Logging
-from .data import SyncAccount
+from .account import SyncAccount
 from .rules import Rule , RuleError
 from .utils import FatalError
 
