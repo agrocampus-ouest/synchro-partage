@@ -25,16 +25,8 @@ class CalendarSync:
         self.folder_color_ = cfg.get( 'calendars' , 'folder-color' )
         self.blocking_ = cfg.has_flag( 'calendars' , 'blocking-events' )
 
-        fixer = lambda addr : addr
-        if not cfg.has_flag( 'bss' , 'dont-fix-domains' ):
-            ldap_dom = '@{}'.format( cfg.get( 'ldap' , 'mail-domain' ) )
-            bss_dom = '@{}'.format( cfg.get( 'bss' , 'domain' ) )
-            if ldap_dom != bss_dom:
-                fixer = lambda addr : (
-                        addr if not addr.endswith( ldap_dom )
-                        else ( addr[ :-len( ldap_dom ) ] + bss_dom )
-                    )
-        self.address_fixer_ = fixer
+        from .utils import get_address_fixer
+        self.address_fixer_ = get_address_fixer( cfg )
 
         self.zimbra_ = Zimbra( cfg )
 

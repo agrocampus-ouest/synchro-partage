@@ -84,6 +84,31 @@ def multivalued_check_equals( a , b ):
 
 #-------------------------------------------------------------------------------
 
+def get_address_fixer( cfg ):
+    """
+    Génère une fonction capable de corriger les adresses mail pour l'utilisation
+    d'un domaine de test via l'API.
+
+    :param cfg: la configuration
+
+    :return: une fonction qui corrige les noms de domaines dans les adresses \
+            mail si le domaine mail est différent du domaine BSS et que la \
+            correction n'est pas désactivée, ou une fonction "identité" dans \
+            le cas contraire
+    """
+    ldap_dom = '@{}'.format( cfg.get( 'ldap' , 'mail-domain' ) )
+    if not cfg.has_flag( 'bss' , 'dont-fix-domains' ):
+        bss_dom = '@{}'.format( cfg.get( 'bss' , 'domain' ) )
+        if ldap_dom != bss_dom:
+            return lambda addr : (
+                    addr if not addr.endswith( ldap_dom )
+                        else ( addr[ :-len( ldap_dom ) ] + bss_dom )
+                )
+    return lambda addr : addr
+
+
+#-------------------------------------------------------------------------------
+
 
 class BSSQuery:
     """

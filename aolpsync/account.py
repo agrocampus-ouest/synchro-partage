@@ -709,17 +709,14 @@ class LDAPData:
         if ldap_dom == bss_dom:
             return
 
-        def fix_it_( addr ):
-            if not addr.endswith( ldap_dom ):
-                return addr
-            return addr[ :-len( ldap_dom ) ] + bss_dom
-
         Logging( 'bss' ).warning( 'Domaine mail: {} -> {}'.format(
                 ldap_dom , bss_dom ) )
+        from .utils import get_address_fixer
+        fix_it = get_address_fixer( cfg )
         for account in self.accounts.values( ):
-            account.mail = fix_it_( account.mail )
+            account.mail = fix_it( account.mail )
             if account.aliases is not None:
-                account.aliases = set([ fix_it_( a ) for a in account.aliases ])
+                account.aliases = set([ fix_it( a ) for a in account.aliases ])
 
     def clear_empty_sets( self ):
         """
