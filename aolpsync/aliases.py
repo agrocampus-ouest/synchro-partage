@@ -168,7 +168,9 @@ class AliasesMap:
         mail_dom = '@{}'.format( cfg.get( 'ldap' , 'mail-domain' ) )
         for alias in extra_aliases:
             targets = extra_aliases[ alias ]
-            alias = alias + mail_dom
+            if not alias.endswith( mail_dom ):
+                assert '@' not in alias
+                alias = alias + mail_dom
             if len( targets ) != 1:
                 Logging( 'alias' ).info( 'Alias multiple {} ignoré'.format(
                         alias ) )
