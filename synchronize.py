@@ -299,8 +299,21 @@ class Synchronizer( ProcessSkeleton ):
                 'alias_changes' )
         d = self.__class__.__dict__
         for eppn in updated:
+            failed = False
             for op in ops:
-                if not d[ 'check_' + op ].__call__( self , eppn ): break
+                failed = not d[ 'check_' + op ].__call__( self , eppn )
+                if failed: break
+
+            # Si le compte était marqué à modifier car les groupes diffèraient
+            # mais que cette différence ne provoquait aucune modification chez
+            # Partage, il resterait "à modifier". On le re-sauvegarde donc en
+            # copiant les groupes depuis l'enregistrement LDAP.
+            if failed: continue
+            acc_ldap = self.ldap_accounts[ eppn ]
+            acc_db = self.db_accounts[ eppn ]
+            if acc_ldap.groups != acc_db.groups:
+                acc_db.groups = acc_ldap.groups
+                self.save_account( acc_db )
 
         # (Pré-)suppressions de comptes
         db_only = sdba - sla
