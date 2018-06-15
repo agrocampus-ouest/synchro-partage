@@ -34,6 +34,9 @@ class Provisioner( ProcessSkeleton ):
                 action = 'store' , type = str ,
                 help = '''Le fichier JSON d'initialisation de la base de données
                           à générer''' )
+        parser.add_argument( 'uid' , action = 'store' , nargs = '*' ,
+                help = '''Si des UID sont précisés, limite les données générées
+                          aux comptes correspondants.''' )
 
     def load_redirects( self , in_file ):
         """
@@ -239,6 +242,10 @@ class Provisioner( ProcessSkeleton ):
                         self.arguments.redirects , str( e ) ) )
         else:
             self.redirects = { }
+        if self.arguments.uid:
+            self.ldap_query = ( '(&' + ''.join(
+                    '(uid={})'.format( uid ) for uid in self.arguments.uid
+                ) + ')' )
 
     def process( self ):
         """
