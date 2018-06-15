@@ -552,7 +552,7 @@ class LDAPData:
                     try:
                         a = SyncAccount( cfg ).from_ldap_entry( entry )
                     except AttributeError as e:
-                        Logging( 'ldap' ).error(
+                        Logging( 'ldap' ).warning(
                             'Compte LDAP {}: erreur sur attribut {}'.format(
                                 str( entry.uid ) , str( e ) ) )
                         continue
