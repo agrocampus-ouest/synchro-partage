@@ -78,6 +78,13 @@ class Synchronizer( ProcessSkeleton ):
         """
         acc = self.ldap_accounts[ eppn ]
         bss_acc = acc.to_bss_account( self.coses )
+        if isinstance( acc.ldapMail , str ):
+            lm = acc.ldapMail
+        else:
+            ( lm , *junk ) = tuple( acc.ldapMail )
+        bss_acc.zimbraMailCanonicalAddress = lm
+        bss_acc.zimbraPrefFromDisplay = acc.displayName
+
         pwd_hash = acc.passwordHash.decode( 'ascii' )
         # Création via API
         Logging( ).info( 'Création du compte {}'.format( acc.mail ) )
@@ -90,6 +97,7 @@ class Synchronizer( ProcessSkeleton ):
         aliases = acc.aliases
         acc.aliases = set()
         self.save_account( acc )
+        self.db_accounts[ eppn ] = acc
         # On tente d'ajouter chaque alias
         self.add_aliases( acc , aliases )
 

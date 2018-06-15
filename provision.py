@@ -168,6 +168,12 @@ class Provisioner( ProcessSkeleton ):
             if eppn in self.redirects:
                 ldif_data[ 'zimbraPrefMailForwardingAddress' ] = self.redirects[
                         eppn ]
+            ldif_data[ 'zimbraPrefFromDisplay' ] = account.displayName
+            if isinstance( account.ldapMail , str ):
+                lm = account.ldapMail
+            else:
+                ( lm , *junk ) = tuple( account.ldapMail )
+            ldif_data[ 'zimbraMailCanonicalAddress' ] = lm
             entries.append( ldif_data )
         return entries
 
