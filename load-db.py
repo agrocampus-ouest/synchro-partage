@@ -46,7 +46,7 @@ class DbLoader( ProcessSkeleton ):
             data = aolputils.json_load( str_data )
         except IOError as e:
             raise FatalError( "Impossible de lire '{}': {}".format(
-                    self.arguments.json_input , str_data ) )
+                    self.arguments.json_input , str( e ) ) )
         except json.decoder.JSONDecodeError as e:
             raise FatalError( "Erreur JSON dans '{}' - {}".format(
                     self.arguments.json_input , str( e ) ) )
