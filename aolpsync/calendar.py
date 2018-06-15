@@ -51,7 +51,7 @@ class CalendarSync:
         calendars = self.get_calendars_( address_map )
 
         # Génère l'ensemble des comptes à synchroniser
-        sync = calendars.keys( )
+        sync = set( calendars.keys( ) )
         if sync_set is not None:
             sync.intersection_update( sync_set )
 
