@@ -60,13 +60,9 @@ class AliasCommands:
             Logging( 'alias' ).info( 'Récupération des aliases: {}'.format(
                     command ) )
 
-            child = subprocess.Popen( self.commands[ command ] ,
-                    shell = True ,
-                    stdout = subprocess.PIPE ,
-                    stderr = subprocess.PIPE )
-            ev = child.wait( )
-            output = [ l for l in child.stdout ]
-
+            from .utils import run_shell_command
+            ( ev , output , errors ) = run_shell_command(
+                        self.commands[ command ] )
             if ev != 0:
                 Logging( 'alias' ).error(
                     'Erreur lors de l\'exécution de `{}`: {}'.format(
@@ -74,7 +70,7 @@ class AliasCommands:
                 dump_err = lambda l : Logging( 'alias' ).error( l )
             else:
                 dump_err = lambda l : Logging( 'alias' ).warning( l )
-            for l in child.stderr:
+            for l in errors:
                 dump_err( l )
             if ev != 0:
                 continue

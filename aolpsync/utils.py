@@ -110,6 +110,28 @@ def get_address_fixer( cfg ):
 #-------------------------------------------------------------------------------
 
 
+def run_shell_command( command ):
+    """
+    Exécute une commande via le shell.
+
+    :param str command: la ligne de commande à exécuter
+
+    :return: un tuple contenant le code de retour, la sortie standard sous la \
+            forme d'une liste, et l'erreur standard sous la forme d'une liste
+    """
+    import subprocess
+    child = subprocess.Popen( command , shell = True ,
+            stdout = subprocess.PIPE ,
+            stderr = subprocess.PIPE )
+    ev = child.wait( )
+    output = [ l for l in child.stdout ]
+    errors = [ l for l in child.stderr ]
+    return ( ev , output , errors )
+
+
+#-------------------------------------------------------------------------------
+
+
 class BSSQuery:
     """
     Une classe qui peut être passée comme paramètre d'action à BSSAction afin
