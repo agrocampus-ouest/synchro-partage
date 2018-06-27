@@ -162,8 +162,17 @@ class BSSAction:
 
         :param action: le nom de l'appel à effectuer, ou un objet de type \
                 BSSQuery encapsulant ce nom
+        :param _service_: si ce paramètre nommé est présent, il sera utilisé \
+                pour déterminer le nom du module de service à utiliser; s'il \
+                est absent, on utilisera toujours AccountService
         """
-        from lib_Partage_BSS.services import AccountService
+        if '_service_' in kwargs:
+            service_mname = kwargs.pop( '_service_' )
+        else:
+            service_mname = 'Account'
+        service_mname = 'lib_Partage_BSS.services.{}Service'.format(
+                service_mname )
+
         import lib_Partage_BSS.exceptions as bsse
         self.ok_ = False
         is_action = bool( action )
@@ -173,7 +182,7 @@ class BSSAction:
         mode = 'simulé ' if simulate else ''
         from .logging import Logging
         Logging( 'bss' ).debug( 'Appel ' + mode + action
-                + ': arguments ' + repr( args )
+                + ' (module ' + service_mname + '): arguments ' + repr( args )
                 + ' / par nom ' + repr( kwargs ) )
 
         if simulate:
@@ -181,7 +190,9 @@ class BSSAction:
             self.ok_ = True
             return
 
-        func = AccountService.__dict__[ action ]
+        from importlib import import_module
+        service = import_module( service_mname )
+        func = service.__dict__[ action ]
         try:
             self.data_ = func.__call__( *args , **kwargs )
         except ( bsse.NameException , bsse.DomainException ,
