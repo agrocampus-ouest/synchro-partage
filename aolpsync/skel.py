@@ -187,21 +187,45 @@ class ProcessSkeleton:
                 Logging( 'ldap' ).debug( 'Compte {} éliminé via règle'.format(
                         eppn ) )
 
-    def load_db_accounts( self , txn ):
+    def load_db( self , txn ):
         """
-        Lit l'intégralité des comptes depuis la base de données.
+        Lit l'intégralité des comptes et autres informations depuis la base de
+        données. Les comptes chargés seront désérialisés sous la forme
+        d'instances SyncAccount; les autres informations seront stockées dans le
+        dictionnaire misc_data, dans une table correspondant à l'identificateur
+        du type de données et sous la forme de données JSON décodées.
 
         :param txn: la transaction LightningDB
         :return: la liste des comptes lus depuis la base
         """
         def d_( x ): return x.decode( 'utf-8' )
-        def na_( x ): return SyncAccount( self.cfg ).from_json( d_( x ) )
+
+        acc = { }
+        md = { }
+        md_tot = 0
+        from .utils import json_load
         with txn.cursor( ) as cursor:
-            acc = { d_( a[ 0 ] ) : na_( a[ 1 ] ) for a in cursor }
-        for x in acc.values( ): x.clear_empty_sets( )
+            for a in cursor:
+                identifier = d_( a[ 0 ] )
+                data = d_( a[ 1 ] )
+                if '%%%' in identifier:
+                    ( mdt , rid ) = identifier.split( '%%%' )
+                    if mdt not in md:
+                        md[ mdt ] = {}
+                    md[ mdt ][ rid ] = json_load( data )
+                    md_tot += 1
+                else:
+                    account = SyncAccount( self.cfg ).from_json( data )
+                    account.clear_empty_sets( )
+                    acc[ identifier ] = account
+
         Logging( 'db' ).info( '{} comptes chargés depuis la BDD'.format(
                 len( acc ) ) )
+        Logging( 'db' ).info(
+                '{} autres informations dans {} catégories'.format(
+                    md_tot , len( md ) ) )
         self.db_accounts = acc
+        self.misc_data = md
 
     def save_account( self , account ):
         """
@@ -235,6 +259,47 @@ class ProcessSkeleton:
         if not sim:
             with self.db.begin( write = True ) as txn:
                 txn.pop( account.eppn.encode( 'utf-8' ) )
+
+    def save_data( self , d_type , identifier , data ):
+        """
+        Sauvegarde des informations supplémentaires dans la base de données. Si
+        le drapeau de simulation est présent dans la configuration, l'opération
+        ne sera pas réellement effectuée.
+
+        :param str d_type: le type d'information supplémentaire
+        :param str identifier: l'identificateur de l'information
+        :param data: les données à sérialiser
+        """
+        sim = self.cfg.has_flag( 'bss' , 'simulate' )
+        mode = 'simulée ' if sim else ''
+        Logging( 'db' ).debug( ( 'Sauvegarde {}des informations '
+                        + 'supplémentaires {} de type {}' ).format(
+                mode , identifier , d_type ) )
+        if sim: return
+
+        from .utils import json_dump
+        db_key = '{}%%%{}'.format( d_type , identifier ).encode( 'utf-8' )
+        with self.db.begin( write = True ) as txn:
+            txn.put( db_key , json_dump( data ).encode( 'utf-8' ) )
+
+    def remove_data( self , d_type , identifier ):
+        """
+        Supprime l'enregistrement pour des informations supplémentaires de la
+        base de données.
+
+        :param str d_type: le type d'information supplémentaire
+        :param str identifier: l'identificateur de l'information
+        """
+        sim = self.cfg.has_flag( 'bss' , 'simulate' )
+        mode = 'simulée ' if sim else ''
+        Logging( 'db' ).debug( ( 'Suppression {}des informations '
+                        + 'supplémentaires {} de type {}' ).format(
+                mode , identifier , d_type ) )
+        if sim: return
+
+        db_key = '{}%%%{}'.format( d_type , identifier ).encode( 'utf-8' )
+        with self.db.begin( write = True ) as txn:
+            txn.pop( db_key )
 
     def preinit( self ):
         """
@@ -343,7 +408,7 @@ class ProcessSkeleton:
         with self.cfg.lmdb_env( ) as db:
             self.db = db
             with db.begin( write = False ) as txn:
-                self.load_db_accounts( txn )
+                self.load_db( txn )
             self.process( )
         self.postprocess( )
 
