@@ -113,6 +113,24 @@ eppn-domain=agrocampus-ouest.fr
 	#from-iris=ssh -i "!configdir!/iris.key" rsyncusr@iris echo
 
 
+################################################################################
+# Groupes Partage et aliases de mailing lists
+################################################################################
+
+# Cette section permet de configurer le script de synchronisation des mailing
+# lists. Une commande permettant d'extraire les informations depuis un serveur
+# Sympa doit être spécifiée (in fine, cette commande devrait exécuter d'une
+# manière ou d'une autre le script Perl lecture-listes-sympa.pl fourni dans le
+# répertoire autres_elements/), ainsi que le nom du serveur qui devra recevoir
+# les messages pour les mailing lists.
+
+[bss-groups]
+	# La commande à exécuter
+	command=ssh -qi "!configdir!/mlreader.key" mlreader@listes echo
+	# Le domaine du serveur de mailing lists
+	ml-domain=listes.agrocampus-ouest.fr
+
+
 
 ################################################################################
 # Configuration des bases de données

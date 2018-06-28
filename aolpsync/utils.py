@@ -123,10 +123,11 @@ def run_shell_command( command ):
     child = subprocess.Popen( command , shell = True ,
             stdout = subprocess.PIPE ,
             stderr = subprocess.PIPE )
-    ev = child.wait( )
-    output = [ l for l in child.stdout ]
-    errors = [ l for l in child.stderr ]
-    return ( ev , output , errors )
+    ( output , errors ) = child.communicate( )
+    rc = child.wait( )
+    fix = lambda x : [ l + b'\n'
+            for l in x.replace( b'\r\n' , b'\n' ).split( b'\n' ) ]
+    return ( rc , fix( output ) , fix( errors ) )
 
 
 #-------------------------------------------------------------------------------
