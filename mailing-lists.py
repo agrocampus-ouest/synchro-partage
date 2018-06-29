@@ -59,12 +59,13 @@ class MailingListSynchronizer( ProcessSkeleton ):
         bss_dom = self.cfg.get( 'bss' , 'domain' )
         ml_dom = self.cfg.get( 'bss-groups' , 'ml-domain' )
         addr_fixer = aolputils.get_address_fixer( self.cfg )
+        m_id = row[ 0 ].strip( )
         data = {
-            'id'        : row[ 0 ] ,
-            'name'      : addr_fixer( '{}@{}'.format( row[ 0 ] , bss_dom ) ) ,
-            'target'    : '{}@{}'.format( row[ 0 ] , ml_dom ) ,
+            'id'        : m_id ,
+            'name'      : addr_fixer( '{}@{}'.format( m_id , bss_dom ) ) ,
+            'target'    : '{}@{}'.format( m_id , ml_dom ) ,
             'hidden'    : int( row[ 1 ] ) == 1 ,
-            'desc'      : row[ 3 ] ,
+            'desc'      : row[ 3 ].strip( ) ,
             'is_list'   : int( row[ 2 ] ) == 1 ,
             'is_group'  : False ,
             'aliases'   : set( ) ,
@@ -80,7 +81,7 @@ class MailingListSynchronizer( ProcessSkeleton ):
                     delimiter = ',' , quotechar = '"' )
         p_list = False
         for sr in reader:
-            ( name , value ) = ( sr[ 0 ].lower( ) , sr[ 1 ] )
+            ( name , value ) = ( sr[ 0 ].lower( ) , sr[ 1 ].strip( ) )
             if name == 'alias':
                 if '@' in value:
                     value = addr_fixer( value )
