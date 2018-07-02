@@ -261,7 +261,7 @@ class MailingListSynchronizer( ProcessSkeleton ):
                         ml_list.senders_set , _service_ = 'Group' ):
                     continue
                 db_list.senders_set.clear( )
-                db_list.senders_set.update( db_list.senders_set )
+                db_list.senders_set.update( ml_list.senders_set )
                 self.save_data( 'group' , ln , db_list.to_json_record( ) )
 
 
