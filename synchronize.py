@@ -307,12 +307,21 @@ class Synchronizer( ProcessSkeleton ):
             # Si le compte était marqué à modifier car les groupes diffèraient
             # mais que cette différence ne provoquait aucune modification chez
             # Partage, il resterait "à modifier". On le re-sauvegarde donc en
-            # copiant les groupes depuis l'enregistrement LDAP.
+            # copiant les groupes depuis l'enregistrement LDAP. Le même principe
+            # est également appliqué aux attributs supplémentaires.
             if failed: continue
             acc_ldap = self.ldap_accounts[ eppn ]
             acc_db = self.db_accounts[ eppn ]
+            has_changed = False
+            for ea in self.cfg.get_list( 'extra-attributes' , () ):
+                ldap_val = getattr( acc_ldap , ea )
+                if ldap_val != getattr( acc_db , ea ):
+                    has_changed = True
+                    setattr( acc_db , ea , ldap_val )
             if acc_ldap.groups != acc_db.groups:
                 acc_db.groups = acc_ldap.groups
+                has_changed = True
+            if has_changed:
                 self.save_account( acc_db )
 
         # (Pré-)suppressions de comptes
