@@ -274,9 +274,12 @@ class Zimbra:
         if self.user_ is None:
             return
         Logging( 'zimbra' ).debug( 'Déconnexion de {}'.format( self.user_ ) )
-        self.send_request_( 'Account' , 'EndSession' )
-        self.user_ = None
-        self.token_ = None
+        try:
+            self.send_request_( 'Account' , 'EndSession' )
+        except Exception as e:
+            self.user_ = None
+            self.token_ = None
+            raise e
 
     def set_user( self , user_name ):
         """
@@ -438,11 +441,11 @@ class Zimbra:
                 s'est produite
         """
         assert self.token_ is not None
+        if data is None:
+            data = dict()
         Logging( 'zimbra.request' ).debug(
                 'Requête {}.{}( {} )'.format(
                     namespace , request , repr( data ) ) )
-        if data is None:
-            data = dict()
         req = self.comm_.gen_request( token = self.token_ )
         req.add_request( request + 'Request' , data , 'urn:zimbra' + namespace )
         response = self.comm_.send_request( req )
