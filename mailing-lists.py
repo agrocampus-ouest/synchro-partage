@@ -170,6 +170,30 @@ class MailingListSynchronizer( ProcessSkeleton ):
         self.remove_data( 'group' , mail )
         self.db_lists.pop( mail )
 
+    def add_aliases( self , group , aliases ):
+        for alias in aliases:
+            if not BSSAction( 'addGroupAliases' , group.name , alias ,
+                    _service_ = 'Group' ):
+                continue
+            group.aliases_set.add( alias )
+            self.save_data( 'group' , group.name , group.to_json_record( ) )
+
+    def add_members( self , group , members ):
+        for member in members:
+            if not BSSAction( 'addGroupMembers' , group.name , member ,
+                    _service_ = 'Group' ):
+                continue
+            group.members_set.add( member )
+            self.save_data( 'group' , group.name , group.to_json_record( ) )
+
+    def add_senders( self , group , senders ):
+        for sender in senders:
+            if not BSSAction( 'addGroupSenders' , group.name , sender ,
+                    _service_ = 'Group' ):
+                continue
+            group.senders_set.add( sender )
+            self.save_data( 'group' , group.name , group.to_json_record( ) )
+
     def process( self ):
         self.address_map = {}
         for eppn in self.db_accounts:
@@ -218,22 +242,26 @@ class MailingListSynchronizer( ProcessSkeleton ):
         add_lists = ml_set - db_set
         for l in add_lists:
             ml = self.ml_lists[ l ]
+            oml_members = set( ml.members_set )
+            oml_senders = set( ml.senders_set )
+            oml_aliases = set( ml.aliases_set )
+            ml.members_set.clear( )
+            ml.senders_set.clear( )
+            ml.aliases_set.clear( )
             if not BSSAction( 'createGroup' , ml , _service_ = 'Group' ):
                 continue
             self.db_lists[ l ] = ml
             self.save_data( 'group' , l , ml.to_json_record( ) )
+            if oml_aliases: self.add_aliases( ml , oml_aliases )
+            if oml_members: self.add_members( ml , oml_members )
+            if oml_senders: self.add_senders( ml , oml_senders )
 
         # Ajout d'aliases de listes
         for ln in common:
             l = self.db_lists[ ln ]
             ml_list = self.ml_lists[ l.name ]
             add_aliases = ml_list.aliases_set - l.aliases_set
-            if not add_aliases: continue
-            if not BSSAction( 'addGroupAliases' , l.name , add_aliases ,
-                    _service_ = 'Group' ):
-                continue
-            l.aliases_set.update( add_aliases )
-            self.save_data( 'group' , l.name , l.to_json_record( ) )
+            if add_aliases: self.add_aliases( l , add_aliases )
 
         # Mise à jour des informations de chaque liste
         from lib_Partage_BSS.models.Group import Group
