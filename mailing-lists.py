@@ -115,7 +115,6 @@ class MailingListSynchronizer( ProcessSkeleton ):
                                 data[ 'id' ] , name ) )
         if p_list:
             data[ 'is_list' ] = True
-            data[ 'is_group' ] = False
             data[ 'target' ] = None
         return data
 
