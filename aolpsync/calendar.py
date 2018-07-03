@@ -47,15 +47,32 @@ class CalendarSync:
         if sync_set is not None:
             sync.intersection_update( sync_set )
 
-        # Pour chaque compte, on ajoute l'emploi du temps
+        # Pour chaque compte, on ajoute l'emploi du temps. On essaie 3 fois en
+        # cas d'échec Zimbra.
+        max_attempts = 3
         for eppn in sync:
+            attempts = 0
             addr = accounts[ eppn ].mail
-            try:
-                self.add_calendar_( addr , calendars[ eppn ] )
-            except ZimbraError as e:
+            exit_loop = False
+            log_err = None
+            while attempts < max_attempts and not exit_loop:
+                try:
+                    self.add_calendar_( addr , calendars[ eppn ] )
+                except ZimbraConnectionError as e:
+                    log_err = e
+                    exit_loop = True
+                except ZimbraRequestError as e:
+                    is_exp = str( e.fault_code ) == 'service.AUTH_EXPIRED'
+                    if not is_exp or attempts == max_attempts - 1:
+                        exit_loop = True
+                        log_err = e
+                else:
+                    exit_loop = True
+                attempts += 1
+            if log_err is not None:
                 Logging( 'cal' ).error( ( 'Erreur Zimbra lors de la mise à '
                         + 'jour du calendrier pour {}: {}' ).format(
-                                eppn , str( e ) ) )
+                                eppn , str( log_err ) ) )
         self.zimbra_.terminate( )
 
 

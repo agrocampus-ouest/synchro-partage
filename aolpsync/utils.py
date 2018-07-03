@@ -267,11 +267,15 @@ class ZimbraConnectionError( ZimbraError ):
     """
     pass
 
-class ZimbraRequestError( ZimbraError):
+class ZimbraRequestError( ZimbraError ):
     """
     Erreur lors de l'exécution d'une requête API Zimbra.
     """
-    pass
+    def __init__( self , namespace , request , response ):
+        ZimbraError.__init__( self , 'appel {}.{}: {} (code {})'.format(
+                namespace , request , response.get_fault_message( ) ,
+                response.get_fault_code( ) ) )
+        self.fault_code = response.get_fault_code( )
 
 
 #-------------------------------------------------------------------------------
