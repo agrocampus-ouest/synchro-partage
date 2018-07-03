@@ -149,16 +149,30 @@ class SyncAccount:
                 porte le même nom que l'un des attributs par défaut, ou bien \
                 si un attribut n'est pas défini.
         """
-        eppn_dom = cfg.get( 'ldap' , 'eppn-domain' )
+        bss_dom = cfg.get( 'bss' , 'domain' )
         mail_dom = cfg.get( 'ldap' , 'mail-domain' )
+        eppn_dom = cfg.get( 'ldap' , 'eppn-domain' )
+        LA = LDAPAttr
+
+        if bss_dom == mail_dom or cfg.has_flag( 'bss' , 'dont-fix-domains' ):
+            eppn_attr = LA( 'eppn' , 'eduPersonPrincipalName' ,
+                    gen = lambda e : "{}@{}".format( str( e.uid ) , eppn_dom ) )
+        else:
+            from .utils import get_eppn_fixer
+            eppn_fixer = get_eppn_fixer( cfg )
+            def gen_eppn_( la ):
+                la_eppn = getattr( la , 'eduPersonPrincipalName' , None )
+                if la_eppn is None:
+                    return '{}@{}'.format( str( la.uid ) , bss_dom )
+                return eppn_fixer( str( la_eppn ) )
+            eppn_attr = LA( 'eppn' , '' , gen = gen_eppn_ )
+
         extra_attrs = cfg.get_section( 'ldap-extra-attributes' , True )
 
         # On génère la liste des attributs par défaut
-        LA = LDAPAttr
         ldap_attrs = [
             LA( 'uid' ) ,
-            LA( 'eppn' , 'eduPersonPrincipalName' ,
-                gen = lambda e : "{}@{}".format( str( e.uid ) , eppn_dom ) ) ,
+            eppn_attr ,
             LA( 'mail' , '' ,
                 gen = lambda e : "{}@{}".format( str( e.uid ) , mail_dom ) ) ,
             LA( 'surname' , 'sn' ) ,
@@ -616,6 +630,9 @@ class LDAPData:
                         ceux qui ne correspondent pas à des comptes
                 """
                 eppn_domain = cfg.get( 'ldap' , 'eppn-domain' )
+                bss_domain = cfg.get( 'bss' , 'domain' )
+                if bss_domain != eppn_domain:
+                    eppn_domain = bss_domain
                 # On ajoute les groupes aux comptes
                 for g in self.groups:
                     for uid in self.groups[ g ]:

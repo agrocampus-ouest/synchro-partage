@@ -176,6 +176,7 @@ class Provisioner( ProcessSkeleton ):
                 lm = account.ldapMail
             else:
                 ( lm , *junk ) = tuple( account.ldapMail )
+            lm = ( aolputils.get_address_fixer( self.cfg ) )( lm )
             ldif_data[ 'zimbraMailCanonicalAddress' ] = lm
             entries.append( ldif_data )
         return entries

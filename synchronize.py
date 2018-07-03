@@ -82,6 +82,7 @@ class Synchronizer( ProcessSkeleton ):
             lm = acc.ldapMail
         else:
             ( lm , *junk ) = tuple( acc.ldapMail )
+        lm = ( aolputils.get_address_fixer( self.cfg ) )( lm )
         bss_acc.zimbraMailCanonicalAddress = lm
         bss_acc.zimbraPrefFromDisplay = acc.displayName
 

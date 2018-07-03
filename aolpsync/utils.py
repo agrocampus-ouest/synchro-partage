@@ -84,6 +84,31 @@ def multivalued_check_equals( a , b ):
 
 #-------------------------------------------------------------------------------
 
+
+def _get_id_fixer( cfg , ldap_dom_id ):
+    """
+    Génère une fonction capable de corriger les adresses mail ou les EPPN pour
+    l'utilisation d'un domaine de test via l'API.
+
+    :param cfg: la configuration
+    :param ldap_dom_id: le nom de la variable de configuration utilisée \
+            pour les noms de domaines
+
+    :return: une fonction qui corrige les noms de domaines dans les adresses \
+            mail ou EPPN si le domaine configuré est différent du domaine BSS \
+            et que la correction n'est pas désactivée, ou une fonction \
+            "identité" dans le cas contraire
+    """
+    ldap_dom = '@{}'.format( cfg.get( 'ldap' , ldap_dom_id ) )
+    if not cfg.has_flag( 'bss' , 'dont-fix-domains' ):
+        bss_dom = '@{}'.format( cfg.get( 'bss' , 'domain' ) )
+        if ldap_dom != bss_dom:
+            return lambda addr : (
+                    addr if not addr.endswith( ldap_dom )
+                        else ( addr[ :-len( ldap_dom ) ] + bss_dom )
+                )
+    return lambda addr : addr
+
 def get_address_fixer( cfg ):
     """
     Génère une fonction capable de corriger les adresses mail pour l'utilisation
@@ -96,15 +121,21 @@ def get_address_fixer( cfg ):
             correction n'est pas désactivée, ou une fonction "identité" dans \
             le cas contraire
     """
-    ldap_dom = '@{}'.format( cfg.get( 'ldap' , 'mail-domain' ) )
-    if not cfg.has_flag( 'bss' , 'dont-fix-domains' ):
-        bss_dom = '@{}'.format( cfg.get( 'bss' , 'domain' ) )
-        if ldap_dom != bss_dom:
-            return lambda addr : (
-                    addr if not addr.endswith( ldap_dom )
-                        else ( addr[ :-len( ldap_dom ) ] + bss_dom )
-                )
-    return lambda addr : addr
+    return _get_id_fixer( cfg , 'mail-domain' )
+
+def get_eppn_fixer( cfg ):
+    """
+    Génère une fonction capable de corriger les EPPN pour l'utilisation d'un
+    domaine de test via l'API.
+
+    :param cfg: la configuration
+
+    :return: une fonction qui corrige les noms de domaines dans les EPPN \
+            si le domaine EPPN est différent du domaine BSS et que la \
+            correction n'est pas désactivée, ou une fonction "identité" dans \
+            le cas contraire
+    """
+    return _get_id_fixer( cfg , 'eppn-domain' )
 
 
 #-------------------------------------------------------------------------------
