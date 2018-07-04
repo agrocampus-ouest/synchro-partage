@@ -1,5 +1,6 @@
 from .logging import Logging
-from .utils import Zimbra , ZimbraError
+from .utils import ( Zimbra , ZimbraError , ZimbraConnectionError ,
+                     ZimbraRequestError )
 
 
 class CalendarSync:
