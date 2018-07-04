@@ -190,7 +190,7 @@ default-cos=etu_sa_agrocampus-ouest
 # en jours. (OBLIGATOIRE)
 deletion-threshold=160
 
-# Nombre de comptes à lire en une requête lorsque l'on intéroge l'API BSS.
+# Nombre de comptes à lire en une requête lorsque l'on interroge l'API BSS.
 # Valeur par défaut: 100
 page-size=100
 
