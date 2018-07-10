@@ -141,6 +141,9 @@ eppn-domain=agrocampus-ouest.fr
 
 [db]
 
+# Chemin des vérous (OBLIGATOIRE)
+lock-path=/run
+
 # Chemin de la base (OBLIGATOIRE)
 path=/var/lib/partage-sync
 

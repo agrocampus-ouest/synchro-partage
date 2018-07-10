@@ -378,37 +378,42 @@ class ProcessSkeleton:
             'cos'  : require_cos ,
             'ldap' : require_ldap ,
         }
-
-        # Lecture de la configuration, pré-initialisation
-        from .sqldb import init as sql_init
         self.cfg = Config( self.get_cfg_overrides( ) )
-        self.ldap_query = ''
-        sql_init( self.cfg )
-        self.preinit( )
 
-        # Connexion au BSS et chargement des CoS
-        if self.requires[ 'bss' ]:
-            self.cfg.bss_connection( )
-            if self.requires[ 'cos' ]:
-                self.load_cos( )
-                self.cfg.check_coses( self.coses )
-        else:
-            assert not self.requires[ 'cos' ]
+        lock_path = self.cfg.get( 'db' , 'lock-path' , raise_missing = True )
+        lock_file = '{}/aolpsync.{}.lock'.format( lock_path ,
+                self.__class__.__name__ )
+        from .utils import LockFile
+        with LockFile( lock_file ):
+            # Lecture de la configuration, pré-initialisation
+            from .sqldb import init as sql_init
+            self.ldap_query = ''
+            sql_init( self.cfg )
+            self.preinit( )
 
-        # Connexion au LDAP et chargement des donnée.
-        if self.requires[ 'ldap' ]:
-            self.load_from_ldap( )
+            # Connexion au BSS et chargement des CoS
+            if self.requires[ 'bss' ]:
+                self.cfg.bss_connection( )
+                if self.requires[ 'cos' ]:
+                    self.load_cos( )
+                    self.cfg.check_coses( self.coses )
+            else:
+                assert not self.requires[ 'cos' ]
 
-        if self.cfg.has_flag( 'bss' , 'simulate' ):
-            Logging( ).warn( 'Mode simulation activé' )
-            BSSAction.SIMULATE = True
+            # Connexion au LDAP et chargement des donnée.
+            if self.requires[ 'ldap' ]:
+                self.load_from_ldap( )
 
-        # Exécution
-        self.init( )
-        with self.cfg.lmdb_env( ) as db:
-            self.db = db
-            with db.begin( write = False ) as txn:
-                self.load_db( txn )
-            self.process( )
-        self.postprocess( )
+            if self.cfg.has_flag( 'bss' , 'simulate' ):
+                Logging( ).warn( 'Mode simulation activé' )
+                BSSAction.SIMULATE = True
+
+            # Exécution
+            self.init( )
+            with self.cfg.lmdb_env( ) as db:
+                self.db = db
+                with db.begin( write = False ) as txn:
+                    self.load_db( txn )
+                self.process( )
+            self.postprocess( )
 
