@@ -385,6 +385,53 @@ class ProcessSkeleton:
             self.process( )
         self.postprocess( )
 
+    def get_error_lock_( self ):
+        """
+        Retourne le chemin du fichier servant de vérou d'erreurs.
+        """
+        lock_path = self.cfg.get( 'db' , 'lock-path' )
+        return '{}/aolpsync.error'.format( lock_path )
+
+    def set_error_( self ):
+        """
+        Tente de créer le fichier servant de vérou d'erreurs.
+
+        :return: True si le fichier a été créé, False s'il existait déjà
+        """
+        import os
+        err_lock = self.get_error_lock_( )
+        err_lock_temp = '{}.{}'.format( err_lock , os.getpid( ) )
+        try:
+            with open( err_lock_temp , 'w' ) as f: pass
+        except IOError as e:
+            raise FatalError( ( 'En essayant de positionner le '
+                        + 'fichier d\'erreur: {}' ).format( str( e ) ) )
+        try:
+            os.link( err_lock_temp , err_lock )
+        except FileExistsError:
+            return False
+        else:
+            return True
+        finally:
+            try:
+                os.unlink( err_lock_temp )
+            except Exception as e:
+                Logging( ).warning( 'En supprimant {}: {}'.format(
+                        err_lock_temp , str( e ) ) )
+
+    def clear_error_( self ):
+        """
+        Supprime le vérou d'erreurs.
+        """
+        from os import unlink
+        try:
+            unlink( self.get_error_lock_( ) )
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            Logging( ).warning( 'En supprimant {}: {}'.format(
+                    err_lock_temp , str( e ) ) )
+
     def __init__( self ,
             require_bss = True ,
             require_cos = True ,
@@ -421,6 +468,25 @@ class ProcessSkeleton:
         lock_file = '{}/aolpsync.{}.lock'.format( lock_path ,
                 self.__class__.__name__ )
         from .utils import LockFile
+        from sys import exit
         with LockFile( lock_file ):
-            self.run_( )
-
+            from ldap3.core.exceptions import LDAPCommunicationError
+            import requests.packages.urllib3.exceptions as rpue
+            import requests.exceptions as re
+            import xml.etree.ElementTree as et
+            try:
+                self.run_( )
+            except LDAPCommunicationError as e:
+                if self.set_error_( ):
+                    raise FatalError( ( 'Erreur de connexion LDAP ({}) '
+                            + '- Ce message ne sera envoyé qu\'une fois, même '
+                            + 'si le problème persiste.' ).format( str( e ) ) )
+                exit( 3 )
+            except ( rpue.HTTPError , re.HTTPError , et.ElementTree ) as e:
+                if self.set_error_( ):
+                    raise FatalError( ( 'Erreur de connexion HTTP ({}) '
+                            + '- Ce message ne sera envoyé qu\'une fois, même '
+                            + 'si le problème persiste.' ).format( str( e ) ) )
+                exit( 4 )
+            else:
+                self.clear_error_( )
