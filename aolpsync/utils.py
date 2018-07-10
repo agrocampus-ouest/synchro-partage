@@ -485,9 +485,7 @@ class Zimbra:
         req.add_request( request + 'Request' , data , 'urn:zimbra' + namespace )
         response = self.comm_.send_request( req )
         if response.is_fault( ):
-            raise ZimbraRequestError( 'appel {}.{}: {} (code {})'.format(
-                    namespace , request , response.get_fault_message( ) ,
-                    response.get_fault_code( ) ) )
+            raise ZimbraRequestError( namespace , request , response )
         rv = response.get_response( )
         return rv[ request + 'Response' ]
 

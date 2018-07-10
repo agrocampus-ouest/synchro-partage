@@ -482,9 +482,9 @@ class ProcessSkeleton:
                             + '- Ce message ne sera envoyé qu\'une fois, même '
                             + 'si le problème persiste.' ).format( str( e ) ) )
                 exit( 3 )
-            except ( rpue.HTTPError , re.HTTPError , et.ElementTree ) as e:
+            except ( rpue.HTTPError , re.HTTPError , et.ParseError ) as e:
                 if self.set_error_( ):
-                    raise FatalError( ( 'Erreur de connexion HTTP ({}) '
+                    raise FatalError( ( 'Erreur de connexion/service HTTP ({}) '
                             + '- Ce message ne sera envoyé qu\'une fois, même '
                             + 'si le problème persiste.' ).format( str( e ) ) )
                 exit( 4 )
