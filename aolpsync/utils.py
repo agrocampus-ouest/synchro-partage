@@ -490,3 +490,106 @@ class Zimbra:
                     response.get_fault_code( ) ) )
         rv = response.get_response( )
         return rv[ request + 'Response' ]
+
+
+#-------------------------------------------------------------------------------
+
+class LockFile:
+    """
+    Un fichier de vérouillage qui peut être utilisé avec with. L'identifiant du
+    processus actuel sera écrit dans le fichier.
+    """
+
+    def __init__( self , file_name , max_attempts = 1 ):
+        self.file_name_ = file_name
+        self.max_attempts_ = max_attempts
+
+    def __enter__( self ):
+        import os
+        pid = os.getpid( )
+        pid_lock = '{}.{}'.format( self.file_name_ , pid )
+
+        # On crée le fichier contenant le PID du process actuel, avec un nom
+        # qui devrait être unique
+        try:
+            with open( pid_lock , "w" ) as lock_file:
+                print( pid , file = lock_file )
+        except IOError as e:
+            raise FatalError( "Impossible de créer de vérou {}: {}".format(
+                    pid_lock , str( e ) ) )
+
+        self.attempts_ = self.max_attempts_
+        self.created_ = False
+        try:
+            self.create_lock_( pid_lock )
+            self.created_ = True
+        finally:
+            os.unlink( pid_lock )
+
+    def __exit__( self , *args ):
+        if self.created_:
+            from os import unlink
+            unlink( self.file_name_ )
+            self.created_ = False
+
+    def create_lock_( self , pid_lock ):
+        if self.make_hardlink_( pid_lock ):
+            return
+
+        # Le fichier vérou existe déjà. Est-ce un résidu, ou est-ce que cela
+        # correspond à un vrai processus?
+        import os
+        old_pid = self.read_lock_file_( )
+        retry = False
+        if old_pid is None:
+            retry = True
+        else:
+            # Détection du processus
+            try:
+                os.kill( old_pid , 0 )
+            except ProcessLookupError:
+                retry = True
+            except PermissionError:
+                pass
+        if retry and self.attempts_ > 0:
+            # Suppression du vérou précédent
+            try:
+                os.unlink( self.file_name_ )
+            except FileNotFoundError:
+                pass
+            except IOError as e:
+                raise FatalError( ( "Impossible de supprimer l'ancien "
+                            + "vérou {}: {}" ).format(
+                        self.file_name_ , str( e ) ) )
+            self.attempts_ -= 1
+            self.create_lock_( pid_lock )
+        raise FatalError( "Le vérou {} est déjà présent".format(
+                self.file_name_ ) )
+
+
+    def make_hardlink_( self , pid_lock ):
+        try:
+            from os import link
+            link( pid_lock , self.file_name_ )
+            return True
+        except FileExistsError:
+            return False
+        except IOError as e:
+            raise FatalError( "Impossible de créer de vérou {}: {}".format(
+                    pid_lock , str( e ) ) )
+
+    def read_lock_file_( self ):
+        try:
+            with open( self.file_name_ , 'r' ) as f:
+                f_line = f.readline( )
+            old_pid = int( f_line )
+        except ValueError:
+            # Le fichier contient quelque chose d'incorrect
+            old_pid = None
+        except FileNotFoundError:
+            # Le fichier a disparu
+            old_pid = None
+        except IOError as e:
+            raise FatalError( "Impossible de lire l'ancien vérou {}: {}".format(
+                    self.file_name_ , str( e ) ) )
+        return old_pid
