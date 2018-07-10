@@ -348,6 +348,43 @@ class ProcessSkeleton:
                     tp , str( e ) ) )
             return ''
 
+    def run_( self ):
+        """
+        Méthode qui exécute le script à proprement parler, après la mise en
+        place du vérou.
+        """
+        # Lecture de la configuration, pré-initialisation
+        from .sqldb import init as sql_init
+        self.ldap_query = ''
+        sql_init( self.cfg )
+        self.preinit( )
+
+        # Connexion au BSS et chargement des CoS
+        if self.requires[ 'bss' ]:
+            self.cfg.bss_connection( )
+            if self.requires[ 'cos' ]:
+                self.load_cos( )
+                self.cfg.check_coses( self.coses )
+        else:
+            assert not self.requires[ 'cos' ]
+
+        # Connexion au LDAP et chargement des donnée.
+        if self.requires[ 'ldap' ]:
+            self.load_from_ldap( )
+
+        if self.cfg.has_flag( 'bss' , 'simulate' ):
+            Logging( ).warn( 'Mode simulation activé' )
+            BSSAction.SIMULATE = True
+
+        # Exécution
+        self.init( )
+        with self.cfg.lmdb_env( ) as db:
+            self.db = db
+            with db.begin( write = False ) as txn:
+                self.load_db( txn )
+            self.process( )
+        self.postprocess( )
+
     def __init__( self ,
             require_bss = True ,
             require_cos = True ,
@@ -385,35 +422,5 @@ class ProcessSkeleton:
                 self.__class__.__name__ )
         from .utils import LockFile
         with LockFile( lock_file ):
-            # Lecture de la configuration, pré-initialisation
-            from .sqldb import init as sql_init
-            self.ldap_query = ''
-            sql_init( self.cfg )
-            self.preinit( )
-
-            # Connexion au BSS et chargement des CoS
-            if self.requires[ 'bss' ]:
-                self.cfg.bss_connection( )
-                if self.requires[ 'cos' ]:
-                    self.load_cos( )
-                    self.cfg.check_coses( self.coses )
-            else:
-                assert not self.requires[ 'cos' ]
-
-            # Connexion au LDAP et chargement des donnée.
-            if self.requires[ 'ldap' ]:
-                self.load_from_ldap( )
-
-            if self.cfg.has_flag( 'bss' , 'simulate' ):
-                Logging( ).warn( 'Mode simulation activé' )
-                BSSAction.SIMULATE = True
-
-            # Exécution
-            self.init( )
-            with self.cfg.lmdb_env( ) as db:
-                self.db = db
-                with db.begin( write = False ) as txn:
-                    self.load_db( txn )
-                self.process( )
-            self.postprocess( )
+            self.run_( )
 
