@@ -106,6 +106,8 @@ class SyncAccount:
     LDAP = None
     # Correspondances BSS -> champs locaux
     BSS = None
+    # Champs BSS sur lesquels on ignore la validation par lib_Partage_BSS
+    BSS_BYPASS = None
     # Liste des champs de détail
     DETAILS = None
 
@@ -235,6 +237,9 @@ class SyncAccount:
             '{} -> {}'.format( x , bss_attrs[ x ] )
                 for x in bss_attrs ]) )
         SyncAccount.BSS = bss_attrs
+        SyncAccount.BSS_BYPASS = set([ x
+            for x in cfg.get( 'bss' , 'bypass-acc-checks' , '' ).split( ' ' )
+            if x != '' ])
 
     #---------------------------------------------------------------------------
 
@@ -383,8 +388,11 @@ class SyncAccount:
         ra = Account( self.mail )
         # Copie des attributs
         for bss_attr in SyncAccount.BSS:
-            setattr( ra , bss_attr ,
-                    getattr( self , SyncAccount.BSS[ bss_attr ] ) )
+            value = getattr( self , SyncAccount.BSS[ bss_attr ] )
+            if bss_attr in SyncAccount.BSS_BYPASS:
+                setattr( ra , '_{}'.format( bss_attr ) , value )
+            else:
+                setattr( ra , bss_attr , value )
         # Attribution de la classe de service
         if self.cos is not None:
             ra.zimbraCOSId = coses[ self.cos ]

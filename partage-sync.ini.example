@@ -202,6 +202,13 @@ page-size=100
 # pas commentée, cette correction sera désactivée.
 #dont-fix-domains
 
+# La librairie de l'Université de Rennes qui est utilisée pour manipuler
+# Partage effectue certaines vérifications sur les données envoyées à Partage.
+# Parfois, ces vérifications peuvent engendrer des problèmes de synchronisation
+# car des valeurs seront refusées silencieusement. On peut lister les champs
+# concernés ici afin de ne pas effectuer les vérifications.
+bypass-acc-check=facsimileTelephoneNumber homePhone mobile telephoneNumber
+
 # Règles supplémentaires pour l'assignement de classe de service
 # Chaque règle doit porter le nom d'une classe de service. La syntaxe à utiliser
 # pour la règle elle-même est décrite en en-tête de ce fichier.
