@@ -463,6 +463,8 @@ class ProcessSkeleton:
             'ldap' : require_ldap ,
         }
         self.cfg = Config( self.get_cfg_overrides( ) )
+        Logging( ).info( 'Script {} - exécution'.format(
+                self.__class__.__name__ ) )
 
         lock_path = self.cfg.get( 'db' , 'lock-path' , raise_missing = True )
         lock_file = '{}/aolpsync.{}.lock'.format( lock_path ,
