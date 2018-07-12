@@ -134,6 +134,13 @@ class Config:
         self.cfg_ = config
 
     def parse_cos_rules( self ):
+        """
+        Lit et transforme les règles d'attribution des classes de service.
+
+        :return: un dictionnaire associant les noms des classes de services \
+                aux règles d'attribution correspondantes
+        :raises FatalError: une règle est incorrecte
+        """
         rules = dict( )
         if 'cos-rules' not in self.cfg_:
             return rules
@@ -148,6 +155,13 @@ class Config:
         return rules
 
     def check_coses( self , coses ):
+        """
+        Vérifie que l'ensemble des classes de service référencées dans la
+        configuration existe sur Partage.
+
+        :param coses: la liste des classes de service définies sur Partage
+        :raises FatalError: au moins une classe de service n'existe pas
+        """
         to_check = [ self.get( 'bss' , 'default-cos' ) ] + self.get_list(
                 'cos-rules' , [] )
         for n in to_check:

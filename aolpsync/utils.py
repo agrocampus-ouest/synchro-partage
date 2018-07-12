@@ -499,10 +499,20 @@ class LockFile:
     """
 
     def __init__( self , file_name , max_attempts = 1 ):
+        """
+        Initialise le vérou.
+
+        :param str file_name: le chemin du fichier à utiliser comme vérou
+        :param max_attempts: le nombre maximal d'essais à effectuer lors de la \
+                pose du vérou
+        """
         self.file_name_ = file_name
         self.max_attempts_ = max_attempts
 
     def __enter__( self ):
+        """
+        Pose le vérou.
+        """
         import os
         pid = os.getpid( )
         pid_lock = '{}.{}'.format( self.file_name_ , pid )
@@ -525,12 +535,24 @@ class LockFile:
             os.unlink( pid_lock )
 
     def __exit__( self , *args ):
+        """
+        Ôte le vérou.
+        """
         if self.created_:
             from os import unlink
             unlink( self.file_name_ )
             self.created_ = False
 
     def create_lock_( self , pid_lock ):
+        """
+        Tente de poser le vérou. Si la pose échoue et que d'autres tentatives
+        peuvent être effectuées, ré-entre récursivement.
+
+        :param pid_lock: le nom du fichier temporaire créé, contenant le PID \
+                du processus en cours
+        :raises FatalError: une erreur d'entrée/sortie s'est produite, ou le \
+                vérou n'a pas pu être posé
+        """
         if self.make_hardlink_( pid_lock ):
             return
 
@@ -566,6 +588,13 @@ class LockFile:
 
 
     def make_hardlink_( self , pid_lock ):
+        """
+        Tente de créer un hardlink entre le fichier temporaire et le fichier de
+        vérou.
+
+        :return: True si le vérou a pu être créé, False dans le cas contraire.
+        :raises FatalError: si une erreur d'entrée/sortie se produit.
+        """
         try:
             from os import link
             link( pid_lock , self.file_name_ )
@@ -577,6 +606,14 @@ class LockFile:
                     pid_lock , str( e ) ) )
 
     def read_lock_file_( self ):
+        """
+        Lit le contenu d'un fichier de vérou existant afin de vérifier si le
+        processus qui l'a posé existe toujours.
+
+        :return: None si le fichier a disparu ou s'il contient une valeur \
+                incorrecte, ou bien le PID contenu dans le fichier.
+        :raises FatalError: si une erreur d'entrée/sortie se produit.
+        """
         try:
             with open( self.file_name_ , 'r' ) as f:
                 f_line = f.readline( )
