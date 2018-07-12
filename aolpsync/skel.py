@@ -477,6 +477,7 @@ class ProcessSkeleton:
             import requests.exceptions as re
             import xml.etree.ElementTree as et
             import urllib.error as ue
+            import http.client as hc
             try:
                 self.run_( )
             except LDAPCommunicationError as e:
@@ -486,7 +487,7 @@ class ProcessSkeleton:
                             + 'si le problème persiste.' ).format( str( e ) ) )
                 exit( 3 )
             except ( rpue.HTTPError , re.HTTPError , et.ParseError ,
-                        ue.HTTPError ) as e:
+                        ue.HTTPError , hc.HTTPException ) as e:
                 if self.set_error_( ):
                     raise FatalError( ( 'Erreur de connexion/service HTTP ({}) '
                             + '- Ce message ne sera envoyé qu\'une fois, même '
