@@ -3,20 +3,14 @@
 from aolpsync import *
 
 
-#
-# Mode de fonctionnement avec les envoyeurs autorisés, pour l'instant:
-#
-# -> on supprime des informations reçues de sympa concernant les utilisateurs
-# non trouvés dans la base des utilisateurs
-#
-# -> on ne touche pas ceux de la BDD
-#
-
-
 #-------------------------------------------------------------------------------
 
 
 class MailingListSynchronizer( ProcessSkeleton ):
+    """
+    Script de synchronisation des mailing lists, des groupes et des listes de
+    distribution.
+    """
 
     def __init__( self ):
         ProcessSkeleton.__init__( self ,
@@ -29,7 +23,18 @@ class MailingListSynchronizer( ProcessSkeleton ):
     def cli_register_arguments( self , parser ):
         pass
 
-    def get_ml_data( self ):
+    #---------------------------------------------------------------------------
+
+    def get_ml_data_( self ):
+        """
+        Exécute la commande permettant d'obtenir les données concernant les
+        mailing lists depuis le serveur Sympa.
+
+        :return: les lignes lues sur la sortie standard de la commande
+
+        :raises FatalError: l'exécution de la commande a échoué, ou la sortie \
+                de la commande n'était pas de l'UTF-8 valide.
+        """
         command = self.cfg.get( 'bss-groups' , 'command' , raise_missing = True
                 ).replace( '!configdir!' , Config.CONFIG_DIR )
         ( ev , output , errors ) = aolputils.run_shell_command( command )
@@ -53,7 +58,16 @@ class MailingListSynchronizer( ProcessSkeleton ):
             Logging( 'alias' ).error( 'Contenu non-UTF-8' )
             raise FatalError( 'Impossible de lire la liste des ML' )
 
-    def read_ml_or_group( self , row ):
+    def read_ml_or_group_( self , row ):
+        """
+        Extrait les informations d'une entrée de données lues depuis le serveur
+        Sympa.
+
+        :param input: une entrée CSV lue depuis le serveur
+
+        :return: None si la ligne est vide, ou bien un dictionnaire contenant \
+                les informations de l'entrée lue.
+        """
         if not row:
             return None
         bss_dom = self.cfg.get( 'bss' , 'domain' )
@@ -73,30 +87,35 @@ class MailingListSynchronizer( ProcessSkeleton ):
             'members'   : set( ) ,
         }
         if row[ 4 ] == '':
+            # Pas de données supplémentaires
             if not data[ 'is_list' ]: return None
             return data
 
         import csv
         reader = csv.reader( row[ 4 ].split( '\n' ) ,
                     delimiter = ',' , quotechar = '"' )
-        p_list = False
         for sr in reader:
             ( name , value ) = ( sr[ 0 ].lower( ) , sr[ 1 ].strip( ) )
+            # Entrées d'alias
             if name == 'alias':
                 if '@' in value:
                     value = addr_fixer( value )
                 else:
                     value = '{}@{}'.format( value , bss_dom )
                 data[ 'aliases' ].add( value )
+            # Expéditeurs autorisés
             elif name == 'sender':
                 if '@' in value:
                     value = addr_fixer( value )
                 else:
                     value = '{}@{}'.format( value , bss_dom )
                 if value not in self.address_map:
-                    # FIXME log
+                    Logging( 'ml' ).warning(
+                            'Expéditeur autorisé {} non trouvé'.format(
+                                value ) )
                     continue
                 data[ 'senders' ].add( self.address_map[ value ] )
+            # Membres de la liste
             elif name == 'member':
                 if '@' in value:
                     value = addr_fixer( value )
@@ -105,27 +124,36 @@ class MailingListSynchronizer( ProcessSkeleton ):
                 if value in self.address_map:
                     value = self.address_map[ value ]
                 data[ 'members' ].add( value )
+            # Drapeaux
             elif name == 'partage-group':
                 data[ 'is_group' ] = True
             elif name == 'partage-list':
-                p_list = True
+                data[ 'is_list' ] = True
+                data[ 'target' ] = None
             else:
                 Logging( 'ml' ).warning(
                         '{}: information Sympa inconnue: {}'.format(
                                 data[ 'id' ] , name ) )
-        if p_list:
-            data[ 'is_list' ] = True
-            data[ 'target' ] = None
         return data
 
-    def row_to_groups( self , row ):
+    def row_to_groups_( self , row ):
+        """
+        Transforme le contenu d'une ligne CSV extraite des informations
+        transmises par le serveur Sympa en zéro, une ou deux instances de
+        groupes BSS.
+
+        :param row: la ligne CSV à traiter
+        :return: une liste contenant entre 0 et 2 instances de \
+                lib_Partage_BSS.models.Group.Group
+        """
         from lib_Partage_BSS.models.Group import Group
-        data = self.read_ml_or_group( row )
+        data = self.read_ml_or_group_( row )
         if data is None:
             return ( )
         rv = []
 
         if data[ 'is_group' ]:
+            # Groupes Partage
             ml = Group( 'grp-{}'.format( data[ 'name' ] ) )
             ml.zimbraHideInGal = data[ 'hidden' ]
             ml.description = data[ 'desc' ]
@@ -135,6 +163,7 @@ class MailingListSynchronizer( ProcessSkeleton ):
             rv.append( ml )
 
         if data[ 'is_list' ]:
+            # Mailing lists ou listes de distribution Partage
             ml = Group( data[ 'name' ] )
             ml.zimbraHideInGal = data[ 'hidden' ]
             ml.description = data[ 'desc' ]
@@ -150,7 +179,14 @@ class MailingListSynchronizer( ProcessSkeleton ):
 
         return rv
 
-    def convert_db_lists( self ):
+    def convert_db_lists_( self ):
+        """
+        Transforme les entrées supplémentaires de base de données dans la
+        catégorie 'group' en une liste d'instances de groupes.
+
+        :return: un dictionnaire associant à chaque adresse de groupe l'entrée \
+                correspondande
+        """
         if 'group' not in self.misc_data:
             return {}
         lists = {}
@@ -164,13 +200,28 @@ class MailingListSynchronizer( ProcessSkeleton ):
                 lists[ k ] = ml
         return lists
 
-    def remove_list( self , mail ):
+    def remove_list_( self , mail ):
+        """
+        Supprime un groupe de Partage et de la base de données de
+        synchronisation. Si la suppression sur Partage échoue, l'entrée de base
+        de données ne sera pas affectée.
+
+        :param str mail: l'adresse principale du groupe à supprimer
+        """
         if not BSSAction( 'deleteGroup' , mail , _service_ = 'Group' ):
             return
         self.remove_data( 'group' , mail )
         self.db_lists.pop( mail )
 
-    def add_aliases( self , group , aliases ):
+    def add_aliases_( self , group , aliases ):
+        """
+        Ajoute des alias à un groupe. Une tentative sera effectuée pour chaque
+        alias; en cas de succès, l'alias sera ajouté à l'entrée de base de
+        données correspondante.
+
+        :param group: l'instance de la base de données de synchronisation
+        :param aliases: l'ensemble ou la liste des alias à ajouter
+        """
         for alias in aliases:
             if not BSSAction( 'addGroupAliases' , group.name , alias ,
                     _service_ = 'Group' ):
@@ -178,7 +229,15 @@ class MailingListSynchronizer( ProcessSkeleton ):
             group.aliases_set.add( alias )
             self.save_data( 'group' , group.name , group.to_json_record( ) )
 
-    def add_members( self , group , members ):
+    def add_members_( self , group , members ):
+        """
+        Ajoute des membres à un groupe. Une tentative sera effectuée pour chaque
+        membre; en cas de succès, le membre sera ajouté à l'entrée de base de
+        données correspondante.
+
+        :param group: l'instance de la base de données de synchronisation
+        :param members: la liste ou l'ensemble des membres à ajouter
+        """
         for member in members:
             if not BSSAction( 'addGroupMembers' , group.name , member ,
                     _service_ = 'Group' ):
@@ -186,7 +245,15 @@ class MailingListSynchronizer( ProcessSkeleton ):
             group.members_set.add( member )
             self.save_data( 'group' , group.name , group.to_json_record( ) )
 
-    def add_senders( self , group , senders ):
+    def add_senders_( self , group , senders ):
+        """
+        Ajoute des expéditeurs autorisés à un groupe. Une tentative sera
+        effectuée pour chaque expéditeur. En cas de succès, l'expéditeur sera
+        ajouté à l'entrée de la base de données.
+
+        :param group: l'instance de la base de données de synchronisation
+        :param members: la liste ou l'ensemble des expéditeurs à ajouter
+        """
         for sender in senders:
             if not BSSAction( 'addGroupSenders' , group.name , sender ,
                     _service_ = 'Group' ):
@@ -194,7 +261,14 @@ class MailingListSynchronizer( ProcessSkeleton ):
             group.senders_set.add( sender )
             self.save_data( 'group' , group.name , group.to_json_record( ) )
 
+    #---------------------------------------------------------------------------
+
     def process( self ):
+        """
+        Effectue la synchronisation des mailing lists, groupes et listes de
+        distribution en comparant le contenu de la base de synchronisation et
+        les données envoyées par le serveur Sympa.
+        """
         self.address_map = {}
         for eppn in self.db_accounts:
             acc = self.db_accounts[ eppn ]
@@ -207,15 +281,15 @@ class MailingListSynchronizer( ProcessSkeleton ):
                 self.address_map[ alias ] = eppn
 
         import csv
-        reader = csv.reader( self.get_ml_data( ) , delimiter = ',' ,
+        reader = csv.reader( self.get_ml_data_( ) , delimiter = ',' ,
                 quotechar = '"' )
         lists = {}
         for row in reader:
-            for ml in self.row_to_groups( row ):
+            for ml in self.row_to_groups_( row ):
                 lists[ ml.name ] = ml
         self.ml_lists = lists
 
-        self.db_lists = self.convert_db_lists( )
+        self.db_lists = self.convert_db_lists_( )
 
         db_set = set( self.db_lists.keys( ) )
         ml_set = set( self.ml_lists.keys( ) )
@@ -224,7 +298,7 @@ class MailingListSynchronizer( ProcessSkeleton ):
         # Suppression de listes
         rem_lists = db_set - ml_set
         for l in rem_lists:
-            self.remove_list( l )
+            self.remove_list_( l )
 
         # Suppression d'aliases de listes
         for ln in common:
@@ -252,22 +326,23 @@ class MailingListSynchronizer( ProcessSkeleton ):
                 continue
             self.db_lists[ l ] = ml
             self.save_data( 'group' , l , ml.to_json_record( ) )
-            if oml_aliases: self.add_aliases( ml , oml_aliases )
-            if oml_members: self.add_members( ml , oml_members )
-            if oml_senders: self.add_senders( ml , oml_senders )
+            if oml_aliases: self.add_aliases_( ml , oml_aliases )
+            if oml_members: self.add_members_( ml , oml_members )
+            if oml_senders: self.add_senders_( ml , oml_senders )
 
         # Ajout d'aliases de listes
         for ln in common:
             l = self.db_lists[ ln ]
             ml_list = self.ml_lists[ l.name ]
             add_aliases = ml_list.aliases_set - l.aliases_set
-            if add_aliases: self.add_aliases( l , add_aliases )
+            if add_aliases: self.add_aliases_( l , add_aliases )
 
         # Mise à jour des informations de chaque liste
         from lib_Partage_BSS.models.Group import Group
         for ln in common:
             db_list = self.db_lists[ ln ]
             ml_list = self.ml_lists[ ln ]
+            # Mise à jour des attributs
             if True in [ getattr( db_list , attr ) != getattr( ml_list , attr )
                             for attr in Group.ATTRIBUTES ]:
                 if not BSSAction( 'modifyGroup' , ml_list ,
@@ -276,20 +351,20 @@ class MailingListSynchronizer( ProcessSkeleton ):
                 for attr in Group.ATTRIBUTES:
                     setattr( db_list , attr , getattr( ml_list , attr ) )
                 self.save_data( 'group' , ln , db_list.to_json_record( ) )
+            # Mise à jour des membres
             if db_list.members_set != ml_list.members_set:
-                if not BSSAction( 'updateGroupMembers' , db_list ,
+                if BSSAction( 'updateGroupMembers' , db_list ,
                         ml_list.members_set , _service_ = 'Group' ):
-                    continue
-                db_list.members_set.clear( )
-                db_list.members_set.update( ml_list.members_set )
-                self.save_data( 'group' , ln , db_list.to_json_record( ) )
+                    db_list.members_set.clear( )
+                    db_list.members_set.update( ml_list.members_set )
+                    self.save_data( 'group' , ln , db_list.to_json_record( ) )
+            # Mise à jour des expéditeurs
             if db_list.senders_set != ml_list.senders_set:
-                if not BSSAction( 'updateGroupSenders' , db_list ,
+                if BSSAction( 'updateGroupSenders' , db_list ,
                         ml_list.senders_set , _service_ = 'Group' ):
-                    continue
-                db_list.senders_set.clear( )
-                db_list.senders_set.update( ml_list.senders_set )
-                self.save_data( 'group' , ln , db_list.to_json_record( ) )
+                    db_list.senders_set.clear( )
+                    db_list.senders_set.update( ml_list.senders_set )
+                    self.save_data( 'group' , ln , db_list.to_json_record( ) )
 
 
 #-------------------------------------------------------------------------------
