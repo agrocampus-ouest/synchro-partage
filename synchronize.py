@@ -309,19 +309,19 @@ class Synchronizer( ProcessSkeleton ):
             # mais que cette différence ne provoquait aucune modification chez
             # Partage, il resterait "à modifier". On le re-sauvegarde donc en
             # copiant les groupes depuis l'enregistrement LDAP. Le même principe
-            # est également appliqué aux attributs supplémentaires.
+            # est également appliqué aux attributs supplémentaires et à
+            # ldapMail.
             if failed: continue
             acc_ldap = self.ldap_accounts[ eppn ]
             acc_db = self.db_accounts[ eppn ]
             has_changed = False
-            for ea in self.cfg.get_list( 'extra-attributes' , () ):
+            ns_attrs = self.cfg.get_list( 'extra-attributes' , [] )
+            ns_attrs += ( 'groups' , 'ldapMail' )
+            for ea in ns_attrs:
                 ldap_val = getattr( acc_ldap , ea )
                 if ldap_val != getattr( acc_db , ea ):
-                    has_changed = True
                     setattr( acc_db , ea , ldap_val )
-            if acc_ldap.groups != acc_db.groups:
-                acc_db.groups = acc_ldap.groups
-                has_changed = True
+                    has_changed = True
             if has_changed:
                 self.save_account( acc_db )
 
