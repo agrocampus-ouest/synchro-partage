@@ -192,7 +192,7 @@ class DbEditor( ProcessSkeleton ):
         """
         if v is None:
             return '(pas de valeur)'
-        elif not isinstance( v , str ):
+        elif isinstance( v , list ) or isinstance( v , set ):
             return '\n  {}'.format( '\n  '.join( v ) )
         return '\n  {}'.format( v )
 
