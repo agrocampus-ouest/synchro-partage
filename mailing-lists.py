@@ -92,6 +92,7 @@ class MailingListSynchronizer( ProcessSkeleton ):
             return data
 
         import csv
+        csv.field_size_limit( 2 ** 31 )
         reader = csv.reader( row[ 4 ].split( '\n' ) ,
                     delimiter = ',' , quotechar = '"' )
         for sr in reader:
