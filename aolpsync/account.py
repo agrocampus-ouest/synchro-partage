@@ -389,6 +389,8 @@ class SyncAccount:
         # Copie des attributs
         for bss_attr in SyncAccount.BSS:
             value = getattr( self , SyncAccount.BSS[ bss_attr ] )
+            if value is None:
+                value = ''
             if bss_attr in SyncAccount.BSS_BYPASS:
                 setattr( ra , '_{}'.format( bss_attr ) , value )
             else:
