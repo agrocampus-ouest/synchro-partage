@@ -25,7 +25,37 @@ class CalendarsSynchronizer( ProcessSkeleton ):
         utilisant la liste qui aura été chargée, mais sans être activement
         connecté à la base.
         """
-        pass
+
+        # Doit-on *tout* mettre à jour?
+        n_accounts = int( self.cfg.get( 'calendars' , 'batch-size' , 5 ) )
+        self.do_full_update = ( n_accounts == 0 )
+        if self.do_full_update:
+            return
+
+        # On récupère la liste des comptes déjà mis à jour
+        if 'processed' in self.misc_data[ 'calendars' ]:
+            processed = set( self.misc_data[ 'calendars' ] )
+        else:
+            processed = set( )
+
+        # On génère la liste des mises à jour potentielles
+        potential_updates = list( set( self.db_accounts.keys( ) ) - processed )
+        over = ( len( potential_updates ) <= n_accounts )
+        if over:
+            sync_set = set( potential_updates )
+        else:
+            sync_set = set( potential_updates[ 0 : n_accounts ] )
+
+        # On effectue la mise à jour pour ces comptes
+        CalendarSync( self.cfg ).synchronize( self.db_accounts , sync_set )
+
+        # On enregistre la nouvelle liste de comptes à jour, sauf si l'on a
+        # passé la liste entière; dans ce cas, on efface l'entrée.
+        if over:
+            self.remove_data( 'calendars' , 'processed' )
+        else:
+            self.save_data( 'calendars' , 'processed' , processed + sync_set )
+
 
     def postprocess( self ):
         """
