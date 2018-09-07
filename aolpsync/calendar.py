@@ -37,6 +37,9 @@ class CalendarSync:
 
         :param accounts: la liste des comptes, sous la forme d'un dictionnaire \
                 associant les instances SyncAccount aux EPPN
+        :param sync_set: si ce paramètre est utilisé, il doit contenir un \
+                ensemble d'EPPNs; seuls les comptes correspondants seront \
+                mis à jour, à condition qu'ils existent.
         """
         if not self.enabled: return
 
