@@ -49,7 +49,11 @@ class CalendarSync:
         # Génère l'ensemble des comptes à synchroniser
         sync = set( calendars.keys( ) )
         if sync_set is not None:
+            Logging( 'cal' ).debug(
+                    'Avant sync_set: {} EPPNs'.format( len( sync ) ) )
             sync.intersection_update( sync_set )
+            Logging( 'cal' ).debug(
+                    'Après sync_set: {} EPPNs'.format( len( sync ) ) )
 
         # Pour chaque compte, on ajoute l'emploi du temps. On essaie 3 fois en
         # cas d'échec Zimbra.

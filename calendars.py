@@ -30,13 +30,19 @@ class CalendarsSynchronizer( ProcessSkeleton ):
         n_accounts = int( self.cfg.get( 'calendars' , 'batch-size' , 5 ) )
         self.do_full_update = ( n_accounts == 0 )
         if self.do_full_update:
+            Logging( 'cal' ).info( 'Mise à jour complète' )
             return
+        Logging( 'cal' ).info(
+                'Mise à jour d\'au plus {} comptes'.format( n_accounts ) )
 
         # On récupère la liste des comptes déjà mis à jour
-        if 'processed' in self.misc_data[ 'calendars' ]:
-            processed = set( self.misc_data[ 'calendars' ] )
+        if ( 'calendars' in self.misc_data
+                and 'processed' in self.misc_data[ 'calendars' ] ):
+            processed = set( self.misc_data[ 'calendars' ][ 'processed' ] )
         else:
             processed = set( )
+        Logging( 'cal' ).debug(
+                '{} compte(s) déjà mis à jour'.format( len( processed ) ) )
 
         # On génère la liste des mises à jour potentielles
         potential_updates = list( set( self.db_accounts.keys( ) ) - processed )
@@ -45,6 +51,8 @@ class CalendarsSynchronizer( ProcessSkeleton ):
             sync_set = set( potential_updates )
         else:
             sync_set = set( potential_updates[ 0 : n_accounts ] )
+        Logging( 'cal' ).debug(
+                '{} compte(s) seront synchronisés'.format( len( sync_set ) ) )
 
         # On effectue la mise à jour pour ces comptes
         CalendarSync( self.cfg ).synchronize( self.db_accounts , sync_set )
@@ -52,16 +60,22 @@ class CalendarsSynchronizer( ProcessSkeleton ):
         # On enregistre la nouvelle liste de comptes à jour, sauf si l'on a
         # passé la liste entière; dans ce cas, on efface l'entrée.
         if over:
+            Logging( 'cal' ).debug( 'Cycle terminé' )
             self.remove_data( 'calendars' , 'processed' )
         else:
-            self.save_data( 'calendars' , 'processed' , processed + sync_set )
+            updated = processed | sync_set
+            Logging( 'cal' ).debug(
+                'Cycle en cours: {} comptes mis à jour'.format(
+                    len( updated ) ) )
+            self.save_data( 'calendars' , 'processed' , updated )
 
 
     def postprocess( self ):
         """
         Effectue la synchronisation des calendriers.
         """
-        CalendarSync( self.cfg ).synchronize( self.db_accounts )
+        if self.do_full_update:
+            CalendarSync( self.cfg ).synchronize( self.db_accounts )
 
 #-------------------------------------------------------------------------------
 
