@@ -309,5 +309,10 @@ folder-name=Emploi du temps
 # pas présent, le calendrier ne sera pas inclus dans la recherche.
 # blocking-events
 
+# Nombre de comptes à mettre à jour par exécution; mettre à zéro pour une mise
+# à jour complète (attention, cela cause une charge *importante* sur le serveur
+# Partage)
+batch-size=10
+
 
 # vim: syntax=cfg
