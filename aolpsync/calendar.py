@@ -81,7 +81,10 @@ class CalendarSync:
                 Logging( 'cal' ).error( ( 'Erreur Zimbra lors de la mise à '
                         + 'jour du calendrier pour {}: {}' ).format(
                                 eppn , str( log_err ) ) )
-        self.zimbra_.terminate( )
+        try:
+            self.zimbra_.terminate( )
+        except ZimbraError as e:
+            pass
 
 
     def get_address_map_( self , accounts ):
