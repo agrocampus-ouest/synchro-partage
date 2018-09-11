@@ -112,8 +112,8 @@ class MailingListSynchronizer( ProcessSkeleton ):
                     value = '{}@{}'.format( value , bss_dom )
                 if value not in self.address_map:
                     Logging( 'ml' ).warning(
-                            'Expéditeur autorisé {} non trouvé'.format(
-                                value ) )
+                            '{}: expéditeur autorisé {} non trouvé'.format(
+                                data[ 'id' ] , value ) )
                     continue
                 data[ 'senders' ].add( self.address_map[ value ] )
             # Membres de la liste
