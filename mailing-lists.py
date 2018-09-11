@@ -199,6 +199,7 @@ class MailingListSynchronizer( ProcessSkeleton ):
                 SPECIAL = ( 'request' , 'editor' , 'unsubscribe' , 'owner' )
                 for suffix in SPECIAL:
                     name = self.add_mail_suffix_( data[ 'name' ] , suffix )
+                    ml = Group( name )
                     ml.zimbraHideInGal = True
                     ml.description = '{} (Sympa: {})'.format(
                             data[ 'desc' ] , suffix )
