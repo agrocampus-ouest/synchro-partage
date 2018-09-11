@@ -106,6 +106,7 @@ class MailingListSynchronizer( ProcessSkeleton ):
                 data[ 'aliases' ].add( value )
             # Expéditeurs autorisés
             elif name == 'sender':
+                value = value.lower( )
                 if '@' in value:
                     value = addr_fixer( value )
                 else:
