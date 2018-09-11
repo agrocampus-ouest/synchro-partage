@@ -137,6 +137,21 @@ class MailingListSynchronizer( ProcessSkeleton ):
                                 data[ 'id' ] , name ) )
         return data
 
+    def add_mail_suffix_( self , original , suffix ):
+        """
+        Ajoute un suffixe à la partie "utilisateur" d'une adresse mail.
+
+        :param original: l'adresse mail originale
+        :param suffix: le suffixe à ajouter
+        :return: l'adresse modifiée
+        """
+        from lib_Partage_BSS.exceptions import NameException
+        spl_name = original.split( '@' )
+        if len( spl_name ) != 2:
+            raise NameException( 'Adresse {} invalide'.format( original ) )
+        name = '{}-{}@{}'.format( spl_name[ 0 ] , suffix , spl_name[ 1 ] )
+        return name
+
     def row_to_groups_( self , row ):
         """
         Transforme le contenu d'une ligne CSV extraite des informations
@@ -144,7 +159,7 @@ class MailingListSynchronizer( ProcessSkeleton ):
         groupes BSS.
 
         :param row: la ligne CSV à traiter
-        :return: une liste contenant entre 0 et 2 instances de \
+        :return: une liste contenant entre 0 et 6 instances de \
                 lib_Partage_BSS.models.Group.Group
         """
         from lib_Partage_BSS.models.Group import Group
@@ -177,6 +192,22 @@ class MailingListSynchronizer( ProcessSkeleton ):
             ml.aliases_set.update( data[ 'aliases' ] )
             ml.senders_set.update( data[ 'senders' ] )
             rv.append( ml )
+            if data[ 'target' ] is not None:
+                # Pour les mailing lists, il faut également générer les aliases
+                # <liste>-request, <liste>-editor, <liste>-unsubscribe et
+                # <liste>-owner
+                SPECIAL = ( 'request' , 'editor' , 'unsubscribe' , 'owner' )
+                for suffix in SPECIAL:
+                    name = self.add_mail_suffix_( data[ 'name' ] , suffix )
+                    ml.zimbraHideInGal = True
+                    ml.description = '{} (Sympa: {})'.format(
+                            data[ 'desc' ] , suffix )
+                    ml.zimbraMailStatus = True
+                    ml.displayName = 'Liste {} - {}' .format(
+                            data[ 'id' ] , suffix )
+                    ml.members_set.add( self.add_mail_suffix_(
+                            data[ 'target' ] , suffix ) )
+                    rv.append( ml )
 
         return rv
 
