@@ -78,13 +78,6 @@ class Synchronizer( ProcessSkeleton ):
         """
         acc = self.ldap_accounts[ eppn ]
         bss_acc = acc.to_bss_account( self.coses )
-        if isinstance( acc.ldapMail , str ):
-            lm = acc.ldapMail
-        else:
-            ( lm , *junk ) = tuple( acc.ldapMail )
-        lm = ( aolputils.get_address_fixer( self.cfg ) )( lm )
-        bss_acc.zimbraMailCanonicalAddress = lm
-        bss_acc.zimbraPrefFromDisplay = acc.displayName
 
         pwd_hash = acc.passwordHash.decode( 'ascii' )
         # Création via API
