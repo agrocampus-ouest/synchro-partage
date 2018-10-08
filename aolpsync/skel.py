@@ -239,7 +239,9 @@ class ProcessSkeleton:
         mode = 'simulée ' if sim else ''
         Logging( 'db' ).debug( 'Sauvegarde {}du compte {} (mail {})'.format(
                 mode , account.eppn, account.mail ) )
-        if sim: return
+        if sim:
+            Logging( 'db' ).debug( 'Données: {}'.format( account.to_json( ) ) )
+            return
 
         db_key = account.eppn.encode( 'utf-8' )
         account.clear_empty_sets( )

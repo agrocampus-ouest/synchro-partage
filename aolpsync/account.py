@@ -102,6 +102,9 @@ class SyncAccount:
 
     # Attributs devant être stockés.
     STORAGE = None
+    # Attributs devant être synchronisés lors de la création du compte
+    # uniquement
+    CREATE_ONLY = None
     # Attributs LDAP
     LDAP = None
     # Correspondances BSS -> champs locaux
@@ -129,14 +132,22 @@ class SyncAccount:
             'displayName' , 'mail' , 'passwordHash' , 'groups' ,
             'ldapMail' , 'markedForDeletion' , 'aliases' , 'cos'
         ])
+        once = set()
 
         # Attributs configurés
-        for ea in cfg.get_list( 'extra-attributes' , () ):
-            if ea in attrs:
+        ea_defs = cfg.get_section( 'extra-attributes' , allow_empty = True )
+        for ea , v in ea_defs.items( ):
+            if ea in attrs or ea in once:
                 raise AttributeDefError( 'Attribut {}: doublon'.format( ea ) )
-            attrs.add( ea )
-        Logging( 'cfg' ).debug( 'Attributs définis: ' + ', '.join( attrs ) )
+            if v == 'once':
+                once.add( ea )
+            else:
+                attrs.add( ea )
+        Logging( 'cfg' ).debug( 'Attributs synchronisés: '
+                + ', '.join( attrs ) )
+        Logging( 'cfg' ).debug( 'Attributs de création: ' + ', '.join( once ) )
         SyncAccount.STORAGE = attrs
+        SyncAccount.CREATE_ONLY = once
 
     @staticmethod
     def init_ldap_attrs_( cfg ):
@@ -188,10 +199,11 @@ class SyncAccount:
 
         # On rajoute les attributs configurés
         defined_attrs = set([ a.local for a in ldap_attrs ])
+        all_attrs = SyncAccount.STORAGE | SyncAccount.CREATE_ONLY
         for ea in extra_attrs:
             if ea in defined_attrs:
                 raise AttributeDefError( 'Attribut {}: doublon'.format( ea ) )
-            if ea not in SyncAccount.STORAGE:
+            if ea not in all_attrs:
                 raise AttributeDefError(
                         'Attribut {}: non défini'.format( ea ) )
             ldap_attrs.append( LA( ea , extra_attrs[ ea ] , opt = True ) )
@@ -220,8 +232,9 @@ class SyncAccount:
         }
 
         # On y ajoute les attributs supplémentaires
+        all_attrs = SyncAccount.STORAGE | SyncAccount.CREATE_ONLY
         for ea in cfg.get_section( 'bss-extra-attributes' , True ):
-            if ea not in SyncAccount.STORAGE:
+            if ea not in all_attrs:
                 raise AttributeDefError(
                         'Attribut {}: non défini'.format( ea ) )
             bss_ea = cfg.get( 'bss-extra-attributes' , ea , ea )
@@ -229,7 +242,8 @@ class SyncAccount:
                 raise AttributeDefError(
                         'Attribut {}: doublon'.format( ea ) )
             bss_attrs[ bss_ea ] = ea
-            details.add( ea )
+            if ea not in SyncAccount.CREATE_ONLY:
+                details.add( ea )
 
         Logging( 'cfg' ).debug( 'Champs de détail: ' + ', '.join( details ) )
         SyncAccount.DETAILS = tuple( details )
@@ -262,7 +276,7 @@ class SyncAccount:
         """
         Réinitialise tous les attributs à None.
         """
-        for attr in SyncAccount.STORAGE:
+        for attr in SyncAccount.STORAGE | SyncAccount.CREATE_ONLY:
             setattr( self , attr , None )
 
     def copy_details_from( self , other ):
@@ -280,7 +294,7 @@ class SyncAccount:
         'Corrige' les attributs en remplaçant les ensembles vides par des
         valeurs non définies.
         """
-        for attr in SyncAccount.STORAGE:
+        for attr in SyncAccount.STORAGE | SyncAccount.CREATE_ONLY:
             av = getattr( self , attr )
             if isinstance( av , set ) and not av:
                 setattr( self , attr , None )
@@ -373,11 +387,14 @@ class SyncAccount:
 
     #---------------------------------------------------------------------------
 
-    def to_bss_account( self , coses ):
+    def to_bss_account( self , coses , create = False ):
         """
         Crée une instance de compte Partage contenant les informations requises
         pour décrire le compte.
 
+        :param coses: le dictionnaire associant à chaque nom de classe de \
+                service un UUID
+        :param bool create: les données vont-elle servir à créer le compte?
         :return: l'instance de compte Partage
         :raises AccountStateError: le compte est marqué pour suppression
         """
@@ -388,7 +405,10 @@ class SyncAccount:
         ra = Account( self.mail )
         # Copie des attributs
         for bss_attr in SyncAccount.BSS:
-            value = getattr( self , SyncAccount.BSS[ bss_attr ] )
+            mapped_from = SyncAccount.BSS[ bss_attr ]
+            if mapped_from in SyncAccount.CREATE_ONLY and not create:
+                continue
+            value = getattr( self , mapped_from )
             if value is None:
                 value = ''
             if bss_attr in SyncAccount.BSS_BYPASS:
@@ -430,7 +450,9 @@ class SyncAccount:
         for bss_attr in SyncAccount.BSS:
             v = getattr( account , bss_attr )
             if v is not None:
-                setattr( self , SyncAccount.BSS[ bss_attr ] , v )
+                mapped_from = SyncAccount.BSS[ bss_attr ]
+                if mapped_from not in SyncAccount.CREATE_ONLY:
+                    setattr( self , mapped_from , v )
         # Aliases
         aliases = account.zimbraMailAlias
         if aliases is not None and aliases:
@@ -455,7 +477,7 @@ class SyncAccount:
     def __repr__( self ):
         return 'SyncAccount({})'.format( ','.join( [
                     a + '=' + repr( getattr( self , a ) )
-                        for a in SyncAccount.STORAGE
+                        for a in SyncAccount.STORAGE | SyncAccount.CREATE_ONLY
             ] ) )
 
     def __str__( self ):

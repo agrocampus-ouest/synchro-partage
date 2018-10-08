@@ -220,19 +220,25 @@ bypass-acc-check=facsimileTelephoneNumber homePhone mobile telephoneNumber
 # Configuration de la synchronisation
 ################################################################################
 
-# Attributs supplémentaires: liste des attributs
+# Attributs supplémentaires: liste des attributs; si un attribut est défini
+# avec la valeur associée "once", il ne sera utilisé que lors de la création du
+# compte et ne sera ensuite plus synchronisé ou vérifié lors de la
+# consolidation.
 [extra-attributes]
 	site
 	affiliation
+	zpfd=once
 
 # Attributs supplémentaires: correspondance attribut local <-> attribut LDAP
 [ldap-extra-attributes]
 	affiliation=eduPersonPrimaryAffiliation
 	site=agrocampusSite
+	zpfd=displayName
 
 # Attributs supplémentaires: correspondance attribut local <-> attribut BSS
 [bss-extra-attributes]
 	site=l
+	zpfd=zimbraPrefFromDisplay
 
 
 ################################################################################

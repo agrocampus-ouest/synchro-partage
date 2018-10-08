@@ -21,8 +21,8 @@ class Synchronizer( ProcessSkeleton ):
         la base de données au fur et à mesure. Si un alias est déjà présent sur
         le compte, il sera ignoré.
 
-        :param SyncAccount account: le compte auquel les aliases doivent être
-        ajoutés
+        :param SyncAccount account: le compte auquel les aliases doivent être \
+                ajoutés
         :param aliases: la liste des aliases à ajouter
         """
         if aliases is None:
@@ -77,7 +77,7 @@ class Synchronizer( ProcessSkeleton ):
                 lues depuis l'enregistrement LDAP
         """
         acc = self.ldap_accounts[ eppn ]
-        bss_acc = acc.to_bss_account( self.coses )
+        bss_acc = acc.to_bss_account( self.coses , create = True )
 
         pwd_hash = acc.passwordHash.decode( 'ascii' )
         # Création via API
@@ -308,7 +308,10 @@ class Synchronizer( ProcessSkeleton ):
             acc_ldap = self.ldap_accounts[ eppn ]
             acc_db = self.db_accounts[ eppn ]
             has_changed = False
-            ns_attrs = self.cfg.get_list( 'extra-attributes' , [] )
+            ns_attrs = [ ea
+                    for ea , v in self.cfg.get_section(
+                            'extra-attributes' , True ).items( )
+                    if v != 'once' ]
             ns_attrs += ( 'groups' , 'ldapMail' )
             for ea in ns_attrs:
                 ldap_val = getattr( acc_ldap , ea )
