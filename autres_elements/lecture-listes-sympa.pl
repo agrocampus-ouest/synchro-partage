@@ -20,8 +20,8 @@ print join( "\n" , ( map {
 		my $send = $list->{admin}{send}{name} ne 'closed';
 
 		my @extraInfo = (
-			( map { '"sender","' . $_->{email} . '"'
-				} @{ $list->{admin}{owner} } ) ,
+			( map { '"sender","' . $_ . '"'
+				} $list->get_admins_email( 'owner' ) ) ,
 			( map { '"member","' . $_->{email} . '"'
 				} $list->get_members( 'member' ) )
 		);
