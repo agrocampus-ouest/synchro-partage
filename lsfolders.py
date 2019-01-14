@@ -39,11 +39,15 @@ class LsFolders( ProcessSkeleton ):
             """
             Fonction d'affichage récursif des dossiers.
             """
-            print( "{} {:^13} {}".format( folder[ 'uuid' ] ,
+            print( "{} {:^13} {}{}".format( folder[ 'uuid' ] ,
                     folder[ 'view' ] if 'view' in folder else 'N/A' ,
-                    folder[ 'absFolderPath' ] ) )
+                    folder[ 'absFolderPath' ] ,
+                    ' (*)' if 'owner' in folder else '' ) )
             if 'folder' in folder:
                 for f in folder[ 'folder' ]:
+                    dump_folder( f )
+            if 'link' in folder:
+                for f in folder[ 'link' ]:
                     dump_folder( f )
 
         try:
