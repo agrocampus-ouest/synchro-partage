@@ -26,7 +26,7 @@
 #	(empty nom)          	Vérifie que l'attribut "nom" n'a pas de valeur
 #	(contains nom valeur)	Vérifie que l'attribut "nom" contient la valeur
 #					spécifiée. Si l'attribut est une simple
-#					chaîne, cet opérateur est équivallent à
+#					chaîne, cet opérateur est équivalent à
 #					l'opérateur 'eq' ci-dessus
 #
 #   Opérateurs logiques:
@@ -294,13 +294,18 @@ report-url=https://partage-sync.agrocampus-ouest.fr/consolidation/
 # ne sera pas effectuée.
 [calendars]
 
-# Base de données SQL source (OBLIGATOIRE)
-# Fait référence à une base de données SQL définie au dessus.
-source=celcat
+# Nombre de comptes à mettre à jour par exécution; mettre à zéro pour une mise
+# à jour complète (attention, cela cause une charge *importante* sur le serveur
+# Partage)
+batch-size=10
 
-# Requête à exécuter dans la base de données (OBLIGATOIRE)
-# Doit renvoyer deux valeurs par entrée: un mail et une URL
-query=SELECT [email] , 'webcal://edt.agrocampus-ouest.fr/ical/ical/' + [url_postfix] + '/schedule.ics' FROM [ICALFEED].[dbo].[VUSER]
+# Liste des sources. Pour chaque source, on devra ajouter une section qui
+# correspond à la configuration de cette source spécifique.
+sources=celcat,institutionnel
+
+
+# Calendriers individuels importés depuis une BDD
+[calendars-celcat]
 
 # Nom de base des calendriers (OBLIGATOIRE)
 # Le nom en question sera utilisé par défaut, mais un nombre y sera ajouté s'il
@@ -315,10 +320,52 @@ folder-name=Emploi du temps
 # pas présent, le calendrier ne sera pas inclus dans la recherche.
 # blocking-events
 
-# Nombre de comptes à mettre à jour par exécution; mettre à zéro pour une mise
-# à jour complète (attention, cela cause une charge *importante* sur le serveur
-# Partage)
-batch-size=10
+# Type de source (OBLIGATOIRE): sql pour une requête SQL listant des sources
+# webcal, mount pour des montages Zimbra
+type=sql
+
+# Base de données SQL source (OBLIGATOIRE)
+# Fait référence à une base de données SQL définie au dessus.
+source=celcat
+
+# Requête à exécuter dans la base de données (OBLIGATOIRE)
+# Doit renvoyer deux valeurs par entrée: un mail et une URL
+query=SELECT [email] , 'webcal://edt.agrocampus-ouest.fr/ical/ical/' + [url_postfix] + '/schedule.ics' FROM [ICALFEED].[dbo].[VUSER]
+
+
+# Calendriers montés depuis un compte générique
+[calendars-institutionnel]
+
+# Nom de base des calendriers (OBLIGATOIRE)
+# Le nom en question sera utilisé par défaut, mais un nombre y sera ajouté s'il
+# n'est pas disponible.
+folder-name=Calendrier des instances
+
+# Couleur à utiliser - le code RGB de la couleur du dossier. La couleur par
+# défaut sera utilisée si ce paramètre n'est pas présent.
+# folder-color=ff00ff
+
+# Drapeau d'inclusion dans la recherche de disponibilités. Si le drapeau n'est
+# pas présent, le calendrier ne sera pas inclus dans la recherche.
+# blocking-events
+
+# Type de source (OBLIGATOIRE): sql pour une requête SQL listant des sources
+# webcal, mount pour des montages Zimbra
+type=mount
+
+# EPPN de l'utilisateur source (OBLIGATOIRE)
+source=partageres@agrocampus-ouest.fr
+
+# UUID du calendrier source (OBLIGATOIRE)
+uuid=deadbeef-1234-5678-9abc-feeddeadbeef
+
+# Règle d'attribution des droits de lecture. Si elle n'est pas précisée,
+# (true) est utilisé.
+#read-rule=(true)
+
+# Règle d'attribution des droits d'écriture. Si elle n'est pas précisée,
+# (false) est utilisé.
+#write-rule=(contains groups dsi)
 
 
 # vim: syntax=cfg
