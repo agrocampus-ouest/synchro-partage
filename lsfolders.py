@@ -42,7 +42,10 @@ class LsFolders( ProcessSkeleton ):
             print( "{} {:^13} {}{}".format( folder[ 'uuid' ] ,
                     folder[ 'view' ] if 'view' in folder else 'N/A' ,
                     folder[ 'absFolderPath' ] ,
-                    ' (*)' if 'owner' in folder else '' ) )
+                    ' (<- {}/{})'.format( folder[ 'owner' ] ,
+                            folder[ 'ruuid' ] )
+                        if 'ruuid' in folder
+                        else '' ) )
             if 'folder' in folder:
                 for f in folder[ 'folder' ]:
                     dump_folder( f )
