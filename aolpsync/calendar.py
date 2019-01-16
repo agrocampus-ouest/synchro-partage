@@ -444,6 +444,14 @@ class CalendarSync:
         """
         if not self.enabled: return
 
+        # Si on n'a pas de sync_set, on le génère à partir des comptes
+        if sync_set is None:
+            sync_set = set( accounts.keys( ) )
+        sync_set = set( k for k in sync_set
+                if accounts[ k ].markedForDeletion is None )
+        if not sync_set:
+            return
+
         # Chargement des données initiales
         address_map = self.get_address_map_( accounts )
         for src in self.sources_:
