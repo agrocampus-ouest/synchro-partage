@@ -538,22 +538,66 @@ class CalendarSync:
         return address_map
 
     def get_user_folders_( self , eppn ):
+        """
+        Récupère les informations complètes concernant les dossiers d'un
+        utilisateur.
+
+        :param eppn: l'EPPN de l'utilisateur
+        :return: les informations des dossiers
+
+        :raises ZimbraError: une erreur de communication s'est produite
+        """
         self.zimbra_.set_user( eppn )
         return self.zimbra_.get_folder( )
 
     def handle_source_( self , source , eppn , privilege , root ):
+        """
+        Effectue les opérations requises pour la synchronisation d'un compte
+        utilisateur par rapport à une source de données.
+
+        :param source: la source de données
+        :param eppn: l'EPPN de l'utilisateur
+        :param privilege: le niveau de privilèges de l'utilisateur sur cette \
+                source (none, ro, rw)
+        :param root: le dossier racine du compte utilisateur
+
+        :raises ZimbraError: une erreur de communication s'est produite
+        """
         self.zimbra_.set_user( eppn )
         imp_folders = source.find_user_folder( eppn , root )
         if privilege == 'none':
-            self.remove_import_( source , eppn , imp_folders )
+            self.remove_import_( source , eppn , [
+                    f[ 1 ][ 'id' ] for f in imp_folders.values( ) ] )
         else:
             self.add_import_( source , eppn , privilege , root , imp_folders )
 
     def remove_import_( self , source , eppn , imp_folders ):
+        """
+        Supprime des dossiers importés depuis une source.
+
+        :param source: la source de données
+        :param eppn: l'EPPN de l'utilisateur
+        :param imp_folders: les identifiants des dossiers à supprimer
+        """
         for folder in imp_folders:
-            self.zimbra_.delete_folder( imp_folders[ folder ][ 1 ][ 'id' ] )
+            Logging( 'cal' ).info(
+                    'Suppression du dossier #{} de {} (source {})'.format(
+                            folder , eppn , source.identifier ) )
+            self.zimbra_.delete_folder( folder )
 
     def add_import_( self , source , eppn , privilege , root , imp_folders ):
+        """
+        Ajoute ou recrée si nécessaire un calendrier importé à partir d'une
+        source de données.
+
+        :param source: la source de données
+        :param eppn: l'EPPN de l'utilisateur
+        :param privilege: le niveau de privilèges de l'utilisateur sur cette \
+                source (none, ro, rw)
+        :param root: le dossier racine du compte utilisateur
+        :param imp_folders: les dossiers existants qui pourraient correspondre \
+                à la source de données
+        """
         # Aucune correspondance -> on crée
         if not imp_folders:
             Logging( 'cal' ).info( 'Création du calendrier {} pour {}'.format(
@@ -575,6 +619,15 @@ class CalendarSync:
         self.zimbra_.move_folder( f_data[ 'id' ] , root[ 'id' ] )
 
     def zimbra_retry_loop_( self , action ):
+        """
+        Exécute une opération utilisant l'API Zimbra, en ré-essayant plusieurs
+        fois si des erreurs d'expiration de l'authentification se produisent.
+
+        :param action: une fonction sans paramètres à exécuter
+        :return un tuple qui contient la valeur de retour de la fonction et \
+                l'erreur Zimbra qui s'est produite (ou None s'il n'y a pas \
+                eu d'erreur)
+        """
         assert callable( action )
         attempts = 0
         exit_loop = False
