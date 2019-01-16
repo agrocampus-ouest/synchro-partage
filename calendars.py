@@ -34,6 +34,7 @@ class CalendarsSynchronizer( ProcessSkeleton ):
 
         # A-t-on une liste d'EPPNs à vérifier?
         if self.arguments.eppn:
+            self.do_full_update = False
             sync_set = set( )
             for eppn in self.arguments.eppn:
                 if '@' not in eppn:
