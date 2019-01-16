@@ -99,13 +99,14 @@ class CalendarImport:
         """
         raise NotImplementedError
 
-    def folder_name( self , root ):
+    def folder_name( self , root , *args ):
         """
         Génère un nom approprié pour un dossier de calendrier à partir du nom
         configuré et du contenu du compte utilisateur; utilisé afin d'éviter
         des problèmes liés à des noms dupliqués.
 
         :param root: le dossier racine de l'utilisateur
+        :param args: dossiers supplémentaires dans lesquels on doit vérifier
         :return: le nom à utiliser pour le dossier
         """
 
@@ -123,12 +124,26 @@ class CalendarImport:
                 or ( 'link' in folder and sub_name in (
                             f[ 'name' ] for f in folder[ 'link' ] ) ) )
 
-        if not has_subfolder_( root , self.folder_name_ ):
+        def check_all_folders_( sub_name ):
+            """
+            Vérifie la présence d'un dossier portant le nom spécifié dans
+            l'intégralité des dossiers passés en paramètre à la méthode
+            folder_name.
+
+            :param sub_name: le nom à vérifier
+            :return: True si l'un des dossiers au moins contient un \
+                    sous-dossier portant le nom spécifié
+            """
+            return True in [
+                    has_subfolder_( f , sub_name )
+                        for f in ( root , *args ) ]
+
+        if not check_all_folders_( self.folder_name_ ):
             return self.folder_name_
         x = 2
         while True:
             n = '{} {}'.format( self.folder_name_ , x )
-            if not has_subfolder_( root , n ):
+            if not check_all_folders_( n ):
                 return n
             x += 1
 
@@ -615,8 +630,28 @@ class CalendarSync:
         f_data = imp_folders[ restore ][ 1 ]
         n = source.folder_name( root )
         if n != f_data[ 'name' ]:
+            trash = self.find_trash_( root )
+            n2 = source.folder_name( root , trash )
+            if n2 != n:
+                self.zimbra_.rename_folder( f_data[ 'id' ] , n2 )
+                self.zimbra_.move_folder( f_data[ 'id' ] , root[ 'id' ] )
+                self.zimbra_.rename_folder( f_data[ 'id' ] , n )
+                return
             self.zimbra_.rename_folder( f_data[ 'id' ] , n )
         self.zimbra_.move_folder( f_data[ 'id' ] , root[ 'id' ] )
+
+    def find_trash_( self , root ):
+        """
+        Trouve le dossier /Trash dans les dossiers de la racine.
+
+        :param root: la racine des dossiers
+        :return: les données du dossier /Trash
+        :raises RuntimeError: si le dossier /Trash n'existe pas
+        """
+        for f in root[ 'folder' ]:
+            if f[ 'absFolderPath' ] == '/Trash':
+                return f
+        raise RuntimeError( 'Dossier /Trash non trouvé' )
 
     def zimbra_retry_loop_( self , action ):
         """
@@ -624,7 +659,7 @@ class CalendarSync:
         fois si des erreurs d'expiration de l'authentification se produisent.
 
         :param action: une fonction sans paramètres à exécuter
-        :return un tuple qui contient la valeur de retour de la fonction et \
+        :return: un tuple qui contient la valeur de retour de la fonction et \
                 l'erreur Zimbra qui s'est produite (ou None s'il n'y a pas \
                 eu d'erreur)
         """
