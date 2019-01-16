@@ -311,10 +311,9 @@ class Zimbra:
         Logging( 'zimbra' ).debug( 'Déconnexion de {}'.format( self.user_ ) )
         try:
             self.send_request_( 'Account' , 'EndSession' )
-        except Exception as e:
+        finally:
             self.user_ = None
             self.token_ = None
-            raise e
 
     def set_user( self , user_name ):
         """
