@@ -223,7 +223,7 @@ class SQLCalendarImport( CalendarImport ):
     def create_user_folder( self , zimbra , eppn , parent_id , name ):
         # Création d'un dossier synchronisé sur l'URL indiquée
         assert eppn in self.data_
-        self.zimbra_.create_folder(
+        zimbra.create_folder(
                 name = name ,
                 parent_id = parent_id ,
                 folder_type = 'appointment',
@@ -464,6 +464,10 @@ class CalendarSync:
                             src ) )
             self.sources_[ src ].set_effective_privileges( self.zimbra_ ,
                     source_privs[ src ] )
+        try:
+            self.zimbra_.terminate( )
+        except ZimbraError as e:
+            pass
 
         # Pour chaque compte, on doit charger la liste des dossiers puis,
         # pour chaque source applicable:
@@ -472,12 +476,12 @@ class CalendarSync:
         #   * le sortir de la poubelle si l'utilisateur a des droits et que le
         #     dossier a été supprimé,
         #   * le créer s'il n'existe pas.
-        for user in user_privs:
-            usrc = user_privs[ user ]
+        for eppn in user_privs:
+            usrc = user_privs[ eppn ]
 
             # Lecture des dossiers
             ( root , err ) = self.zimbra_retry_loop_(
-                    lambda : self.get_user_folders_( user )
+                    lambda : self.get_user_folders_( eppn )
                 )
             if root is None:
                 if err is not None:
@@ -493,7 +497,7 @@ class CalendarSync:
             for src_name in usrc:
                 src = self.sources_[ src_name ]
                 ( junk , err ) = self.zimbra_retry_loop_(
-                        lambda : self.handle_source_( src , user ,
+                        lambda : self.handle_source_( src , eppn ,
                                     usrc[ src_name ] , root )
                     )
                 if err is not None:
@@ -547,7 +551,7 @@ class CalendarSync:
 
     def remove_import_( self , source , eppn , imp_folders ):
         for folder in imp_folders:
-            self.zimbra_.delete_folder( folder[ 'id' ] )
+            self.zimbra_.delete_folder( imp_folders[ folder ][ 1 ][ 'id' ] )
 
     def add_import_( self , source , eppn , privilege , root , imp_folders ):
         # Aucune correspondance -> on crée
@@ -568,7 +572,7 @@ class CalendarSync:
         n = source.folder_name( root )
         if n != f_data[ 'name' ]:
             self.zimbra_.rename_folder( f_data[ 'id' ] , n )
-        self.zimbra_.move_folder( f_data[ 'id' ] , root_folder[ 'id' ] )
+        self.zimbra_.move_folder( f_data[ 'id' ] , root[ 'id' ] )
 
     def zimbra_retry_loop_( self , action ):
         assert callable( action )
