@@ -350,13 +350,14 @@ class Zimbra:
         self.user_ = user_name
         self.token_ = ttok
 
-    def get_folder( self , path = '/' , recursive = True ):
+    def get_folder( self , path = '/' , uuid = None , recursive = True ):
         """
         Lit les informations d'un dossier (au sens Zimbra du terme) et
         éventuellement de ses sous-dossiers.
 
         :param str path: le chemin absolu du dossier sur lequel on veut \
-                des informations
+                des informations; sera ignoré si un UUID est spécifié
+        :param str uuid: l'UUID du dossier sur lequel on veut des informations
         :param bool recursive: les informations des sous-dossiers seront \
                 également lues si ce paramètre est True
 
@@ -365,11 +366,39 @@ class Zimbra:
         """
         Logging( 'zimbra' ).debug( 'Récupération{} du dossier {}'.format(
                 ' récursive' if recursive else '' , path ) )
+        folder_spec = dict( )
+        if uuid is None:
+            folder_spec[ 'path' ] = path
+        else:
+            folder_spec[ 'uuid' ] = uuid
         ls = self.send_request_( 'Mail' , 'GetFolder' , {
-                'path' : path ,
+                'folder' : folder_spec ,
                 'depth' : -1 if recursive else 0
             } )
         return ls[ 'folder' ] if 'folder' in ls else None
+
+    def extract_acl( self , folder_data ):
+        """
+        Extrait les entrées d'ACL d'un dossier vers un dictionnaire.
+
+        :param folder_data: les informations d'un dossier
+
+        :return: un dictionnaire associant à chaque EPPN disposant de droits \
+                sur un dossier un sous-dictionnaire contenant les permissions \
+                et l'identifiant de l'entrée dans ses champs 'perm' et 'zid', \
+                respectivement
+        """
+        if 'acl' not in folder_data or 'grant' not in folder_data[ 'acl' ]:
+            return dict( )
+        rv = dict( )
+        for entry in folder_data[ 'acl' ][ 'grant' ]:
+            if 'd' not in entry or 'perm' not in entry or 'zid' not in entry:
+                continue
+            rv[ entry[ 'd' ] ] = {
+                    'zid'   : entry[ 'zid' ] ,
+                    'perm'  : entry[ 'perm' ] ,
+                }
+        return rv
 
     def create_folder( self , name , parent_id , folder_type ,
             color = None , url = None , flags = None , others = None ):
@@ -411,6 +440,50 @@ class Zimbra:
         if flags is not None: data[ 'f' ] = flags
         return self.send_request_( 'Mail' , 'CreateFolder' , {
                 'folder' : data
+            } )
+
+    def mount( self , source_eppn , source_id , name , parent_id , folder_type ,
+            color = None , flags = None , others = None ):
+        """
+        Demande le montage d'un dossier. Si le mode simulé est activé, l'appel
+        ne sera pas effectué.
+
+        :param source_eppn: l'EPPN de l'utilisateur depuis le compte duquel \
+                on veut monter un dossier
+        :param source_id: l'identifiant Zimbra du dossier à monter
+        :param str name: le nom du dossier à créer
+        :param parent_id: l'identifiant du dossier parent
+        :param str folder_type: le type de dossier à créer (conversation, \
+                message, contact, appointment, task, wiki, document)
+        :param str color: la couleur, sous la forme d'un code RGB hexadécimal \
+                ('#RRGGBB')
+        :param str flags: les drapeaux Zimbra du dossier
+        :param dict others: un dictionnaire contenant des valeurs \
+                supplémentaires à associer au dossier
+
+        :raises ZimbraError: une erreur de communication ou de requête \
+                s'est produite
+        """
+        Logging( 'zimbra' ).debug(
+                ( 'Montage{} du dossier #{} de {} dans le dossier {} '
+                    + '(parent {}, type {})' ).format(
+                        ' simulé' if self.fake_it_ else '' ,
+                        source_id , source_eppn , name , parent_id ,
+                        folder_type ) )
+        if self.fake_it_:
+            return {}
+        data = {
+            'name' : name ,
+            'view' : folder_type ,
+            'l' : parent_id ,
+            'owner' : source_eppn ,
+            'rid' : source_id ,
+        }
+        if others is not None: data.update( others )
+        if color is not None: data[ 'rgb' ] = color
+        if flags is not None: data[ 'f' ] = flags
+        return self.send_request_( 'Mail' , 'CreateMountpoint' , {
+                'link' : data
             } )
 
     def move_folder( self , folder_id , to_id ):
@@ -460,6 +533,83 @@ class Zimbra:
                     'op' : 'rename' ,
                     'id' : folder_id ,
                     'name' : name ,
+                }
+            } )
+
+    def delete_folder( self , folder_id ):
+        """
+        Demande à l'API de supprimer un dossier. Si le mode simulé est activé,
+        l'appel ne sera pas effectué.
+
+        :param folder_id: l'identifiant du dossier à supprimer
+
+        :raises ZimbraError: une erreur de communication ou de requête \
+                s'est produite
+        """
+        Logging( 'zimbra' ).debug(
+                'Suppression{} du dossier #{}'.format(
+                    ' simulée' if self.fake_it_ else '' ,
+                    folder_id ) )
+        if self.fake_it_:
+            return {}
+        return self.send_request_( 'Mail' , 'FolderAction' , {
+                'action' : {
+                    'op' : 'delete' ,
+                    'id' : folder_id ,
+                }
+            } )
+
+    def set_grant( self , folder_id , eppn , perm ):
+        """
+        Demande à l'API de donner des droits sur un dossier à un utilisateur.
+
+        :param folder_id: l'identifiant du dossier sur lequel des droits \
+                doivent être positionnés
+        :param eppn: l'EPPN de l'utilisateur pour lequel des droits doivent \
+                être positionnés
+        :param perm: les permissions à attribuer à l'utilisateur
+
+        :raises ZimbraError: une erreur de communication ou de requête \
+                s'est produite
+        """
+        Logging( 'zimbra' ).debug(
+                'Dossier #{}: mise en place des droits "{}" pour {}'.format(
+                        folder_id , perm , eppn ) )
+        if self.fake_it_:
+            return {}
+        return self.send_request_( 'Mail' , 'FolderAction' , {
+                'action' : {
+                    'op' : 'grant' ,
+                    'id' : folder_id ,
+                    'grant' : {
+                        'perm' : perm ,
+                        'gt' : 'usr' ,
+                        'd' : eppn ,
+                    } ,
+                } ,
+            } )
+
+    def remove_grant( self , folder_id , zid ):
+        """
+        Demande à l'API de supprimer des droits sur un dossier.
+
+        :param folder_id: l'identifiant du dossier pour lequel les droits \
+                doivent être modifiés
+        :param zid: l'identifiant de l'entrée d'ACL à supprimer
+
+        :raises ZimbraError: une erreur de communication ou de requête \
+                s'est produite
+        """
+        Logging( 'zimbra' ).debug(
+                'Dossier #{}: suppression de l\'entrée ACL {}'.format(
+                        folder_id , zid ) )
+        if self.fake_it_:
+            return {}
+        return self.send_request_( 'Mail' , 'FolderAction' , {
+                'action': {
+                    'op': '!grant' ,
+                    'id': folder_id ,
+                    'zid' : zid
                 }
             } )
 
