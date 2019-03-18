@@ -165,8 +165,13 @@ class AliasesMap:
         for alias in extra_aliases:
             targets = extra_aliases[ alias ]
             if not alias.endswith( mail_dom ):
-                assert '@' not in alias
-                alias = alias + mail_dom
+                if '@' in alias:
+                    Logging( 'alias' ).error(
+                            'Alias {}: domaine incorrect'.format(
+                                    alias ) )
+                    continue
+                else:
+                    alias = alias + mail_dom
             if len( targets ) != 1:
                 Logging( 'alias' ).info( 'Alias multiple {} ignoré'.format(
                         alias ) )
