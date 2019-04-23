@@ -98,7 +98,7 @@ class Provisioner( ProcessSkeleton ):
                 return entry.passwordHash.decode( 'ascii' )
             except UnicodeDecodeError:
                 raise FatalError( ( 'Le mot de passe de {} contient des '
-                        + 'caractères non-ASCII' ).format( e.eppn ) )
+                        + 'caractères non-ASCII' ).format( entry.eppn ) )
 
         def mk_lambda_( attr ):
             """
