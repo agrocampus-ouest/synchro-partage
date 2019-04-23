@@ -298,8 +298,17 @@ class Zimbra:
         self.fake_it_ = cfg.has_flag( 'bss' , 'simulate' )
         self.user_ = None
         self.token_ = None
+
+        # On lit le timeout depuis la configuration, s'il est défini. Sinon,
+        # on utilise 10s par défaut.
+        timeout_cfg = cfg.get( 'bss' , 'zimbra-timeout' , '10' )
+        try:
+            timeout_cfg = int( timeout_cfg )
+        except ValueError as e:
+            Logging( 'zimbra' ).error( 'Paramètre zimbra-timeout invalide' )
+            raise FatalError( 'Erreur de configuration' , e )
         from pythonzimbra.communication import Communication
-        self.comm_ = Communication( self.url_ )
+        self.comm_ = Communication( self.url_ , timeout = timeout_cfg )
 
     def terminate( self ):
         """
