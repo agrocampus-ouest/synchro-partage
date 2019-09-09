@@ -480,6 +480,7 @@ class ProcessSkeleton:
             import xml.etree.ElementTree as et
             import urllib.error as ue
             import http.client as hc
+            import socket as skt
             try:
                 self.run_( )
             except LDAPCommunicationError as e:
@@ -495,5 +496,11 @@ class ProcessSkeleton:
                             + '- Ce message ne sera envoyé qu\'une fois, même '
                             + 'si le problème persiste.' ).format( str( e ) ) )
                 exit( 4 )
+            except skt.timeout as e:
+                if self.set_error_( ):
+                    raise FatalError( ( 'Erreur de connexion TCP/IP ({})'
+                            + '- Ce message ne sera envoyé qu\'une fois, même '
+                            + 'si le problème persiste.' ).format( str( e ) ) )
+                exit( 5 )
             else:
                 self.clear_error_( )
