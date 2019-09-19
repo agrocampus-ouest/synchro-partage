@@ -335,6 +335,10 @@ source=celcat
 # Doit renvoyer deux valeurs par entrée: un mail et une URL
 query=SELECT [email] , 'webcal://edt.agrocampus-ouest.fr/ical/ical/' + [url_postfix] + '/schedule.ics' FROM [ICALFEED].[dbo].[VUSER]
 
+# Intervalle de mise à jour automatique, en secondes. Si inférieur ou égal
+# à 0, la mise à jour automatique sera désactivée. Par défaut, la valeur
+# 86400 sera utilisée.
+#polling-interval=86400
 
 # Calendriers montés depuis un compte générique
 [calendars-institutionnel]
