@@ -621,6 +621,44 @@ class Zimbra:
                 }
             } )
 
+    def get_data_sources( self ):
+        """
+        Récupère la liste des sources de données externes associées à un compte
+        Zimbra.
+
+        :return: le résultat de la requête
+
+        :raises ZimbraError: une erreur de communication ou de requête \
+                s'est produite
+        """
+        Logging( 'zimbra' ).debug( 'Liste des sources de données' )
+        return self.send_request_( 'Mail' , 'GetDataSources' , {} )
+
+    def modify_data_source( self , ds_type , ds_id , **kwargs ):
+        """
+        Met à jour les paramètres d'une source de données Zimbra. Cette méthode
+        est essentiellement un wrapper autour de la requête SOAP
+        ZimbraMail::ModifyDataSource. Les paramètres supplémentaires seront
+        passés tels quels à l'API Zimbra.
+
+        :param ds_type: le type de la source de données à modifier
+        :param ds_id: l'identifiant de la source de données à modifier
+
+        :raises ZimbraError: une erreur de communication ou de requête \
+                s'est produite
+        """
+        assert len( kwargs ) != 0
+        data = dict( kwargs )
+        data.update({ 'id' : ds_id })
+        Logging( 'zimbra' ).debug(
+                'Modification de source de données {}: {}'.format(
+                        ds_type , repr( data ) ) )
+        if self.fake_it_:
+            return
+        self.send_request_( 'Mail' , 'ModifyDataSource' , {
+            ds_type : data
+        } )
+
     def send_request_( self , namespace , request , data = None ):
         """
         Envoie une requête au serveur Zimbra
