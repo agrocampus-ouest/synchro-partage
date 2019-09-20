@@ -226,7 +226,7 @@ class SQLCalendarImport( CalendarImport ):
                 raise_missing = True )
         pi_temp = cfg.get( self.src_section_ , 'polling-interval' , 86400 )
         try:
-            self.polling_interval = int( pi_temp ) * 1000
+            self.polling_interval = int( pi_temp )
         except ValueError:
             raise FatalError(
                     ( 'Source de calendriers {}: intervalle de '
@@ -363,13 +363,13 @@ class SQLCalendarImport( CalendarImport ):
                     cal[ 'pollingInterval' ] ) )
 
         # Vérification / mise à jour de l'intervalle de rafraîchissement
-        if cal[ 'pollingInterval' ] == self.polling_interval:
+        if cal[ 'pollingInterval' ] == self.polling_interval * 1000:
             return
         Logging( 'cal.sql' ).info(
                 ( "Mise à jour de l'intervalle de rafraîchissement du dossier "
                         + "#{} de {} ({} ms vers {} ms)" ).format(
                     folder_id , eppn , cal[ 'pollingInterval' ] ,
-                    self.polling_interval ) )
+                    self.polling_interval * 1000 ) )
         try:
             zimbra.modify_data_source( 'cal' , cal[ 'id' ] ,
                     pollingInterval = self.polling_interval )
