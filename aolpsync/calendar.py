@@ -226,7 +226,7 @@ class SQLCalendarImport( CalendarImport ):
                 raise_missing = True )
         pi_temp = cfg.get( self.src_section_ , 'polling-interval' , 86400 )
         try:
-            self.polling_interval = int( pi_temp )
+            self.polling_interval = int( pi_temp ) * 1000
         except ValueError:
             raise FatalError(
                     ( 'Source de calendriers {}: intervalle de '
@@ -308,6 +308,77 @@ class SQLCalendarImport( CalendarImport ):
                 flags = 'i#' + ( '' if self.blocking_ else 'b' ) ,
                 url = self.data_[ eppn ] ,
                 others = { 'sync' : 1 } )
+
+    def needs_postprocess( self ):
+        """
+        Les calendriers externes ont toujours besoin de traîtements
+        supplémentaires.
+        """
+        return True
+
+    def start_postproc_for( self , zimbra , eppn , postproc_data ):
+        """
+        Récupère la liste des sources de données pour cet utilisateur si elle
+        n'a pas déjà été chargée.
+        """
+        assert eppn in self.data_
+        if 'data_sources' not in postproc_data:
+            postproc_data[ 'data_sources' ] = zimbra.get_data_sources( )
+            Logging( 'cal.sql' ).debug( 'Sources de données pour {}: {}'.format(
+                    eppn , repr( postproc_data[ 'data_sources' ] ) ) )
+
+    def postprocess( self , zimbra , eppn , postproc_data , folder_id ):
+        """
+        :param zimbra: une instance de communication avec Zimbra
+        :param eppn: l'EPPN de l'utilisateur
+        :param postproc_data: le dictionnaire contenant les éventuelles \
+                données supplémentaires chargées par start_postproc_for
+        :param folder_id: l'identifiant du dossier ou du point de montage \
+                utilisé pour cette ressource
+        """
+
+        # A-t-on des sources de données ?
+        ds = postproc_data[ 'data_sources' ]
+        if 'cal' not in ds:
+            Logging( 'cal.sql' ).warning(
+                'Pas de sources de type calendrier pour {}'.format( eppn ) )
+            return
+
+        # On recherche la source de données pour ce dossier
+        source = None
+        cals = ds[ 'cal' ] if type( ds[ 'cal' ] ) is list else [ ds[ 'cal' ] ]
+        for cal in cals:
+            if str( folder_id ) == str( cal[ 'l' ] ):
+                source = cal
+                break
+        if source is None:
+            Logging( 'cal.sql' ).warning(
+                'Dossier #{} pour {}: source de données non trouvée'.format(
+                        folder_id , eppn ) )
+            return
+        Logging( 'cal.sql' ).debug(
+                ( 'Dossier #{} pour {}: source de données {} '
+                        + '/ intervalle de mise à jour {} ms' ).format(
+                    folder_id , eppn , cal[ 'id' ] ,
+                    cal[ 'pollingInterval' ] ) )
+
+        # Vérification / mise à jour de l'intervalle de rafraîchissement
+        if cal[ 'pollingInterval' ] == self.polling_interval:
+            return
+        Logging( 'cal.sql' ).info(
+                ( "Mise à jour de l'intervalle de rafraîchissement du dossier "
+                        + "#{} de {} ({} ms vers {} ms)" ).format(
+                    folder_id , eppn , cal[ 'pollingInterval' ] ,
+                    self.polling_interval ) )
+        try:
+            zimbra.modify_data_source( 'cal' , cal[ 'id' ] ,
+                    pollingInterval = self.polling_interval )
+        except ZimbraError as e:
+            Logging( 'cal.sql' ).error(
+                ( "Mise à jour de l'intervalle de rafraîchissement du dossier "
+                        + "#{} de {}: erreur Zimbra {}" ).format(
+                    folder_id , eppn , str( e ) ) )
+
 
 #-------------------------------------------------------------------------------
 
