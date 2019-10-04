@@ -784,7 +784,7 @@ class CalendarSync:
             n = source.folder_name( root )
             folder_info = source.create_user_folder( self.zimbra_ , eppn ,
                                                      root[ 'id' ] , n )
-            return folder_info[ 'id' ]
+            return folder_info[ 'id' ] if 'id' in folder_info else None
 
         # Le calendrier existe et n'est pas à la poubelle -> on ne touche à rien
         if False in ( v[ 0 ] for v in imp_folders.values( ) ):
