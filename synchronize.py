@@ -231,7 +231,8 @@ class Synchronizer( ProcessSkeleton ):
         Effectue la pré-suppression d'un compte. Pour cela, le compte sera clos,
         puis un timestamp sera utilisé pour renommer le compte. Si les deux
         opérations réussissent, le compte sera mis à jour dans la base de
-        données.
+        données, avec une empreinte de mot de passe incorrecte afin de forcer
+        la resynchronisation de celui-ci si le compte est réactivé.
 
         :param str eppn: l'EPPN du compte à pré-supprimer.
         """
@@ -259,6 +260,9 @@ class Synchronizer( ProcessSkeleton ):
             return
         Logging( ).debug( 'Compte {} renommé en {}'.format(
                 dba.mail , del_addr ) )
+
+        # On prépare aussi la nécessaire réinitialisation du mot de passe
+        dba.passwordHash = '(reset me)'
 
         # Et on sauvegarde
         dba.mail = del_addr
