@@ -225,42 +225,42 @@ class Consolidator( ProcessSkeleton ):
                 '''Un compte existant a été mis à jour dans le LDAP mais la
                    synchronisation vers Partage n'a pas encore eu lieu.''' ) ,
             AS( False , 12 , 'LDAP- / DB+ BSS+' , '#cdffc3' ,
-				'''Un compte a été supprimé dans le LDAP mais la synchronisation
-				   vers Partage n'a pas encore eu lieu.''' ) ,
+                '''Un compte a été supprimé dans le LDAP mais la synchronisation
+                   vers Partage n'a pas encore eu lieu.''' ) ,
             AS( False , 13 , 'LDAP+ / DB~ BSS~' , '#cdffc3' ,
                 '''Un compte qui avait été présupprimé a été recréé dans le LDAP
                    mais la synchronisation vers Partage n'a pas encore eu
-				   lieu.''' ) ,
+                   lieu.''' ) ,
             # États erronés avec correction auto
             AS(  True , 20 , 'LDAP+ DB+ / BSS-' , '#f2ffba' ,
-				'''Un compte LDAP existe, ainsi qu'une entrée en base qui y
-				   correspondant exactement. Cependant aucun compte n'existe sur
-				   le serveur Partage.''' ,
-				'suppr. base' ) ,
+                '''Un compte LDAP existe, ainsi qu'une entrée en base qui y
+                   correspondant exactement. Cependant aucun compte n'existe sur
+                   le serveur Partage.''' ,
+                'suppr. base' ) ,
             AS(  True , 21 , 'LDAP+ / DB+ / BSS-' , '#f2ffba' ,
-				'''Un compte LDAP existe, ainsi qu'une entrée en base pour ce
-				   compte. L'entrée en base ne correspond pas au compte LDAP,
-				   et aucune correspondante n'est présente sur Partage.''' ,
-				'suppr. base' ) ,
+                '''Un compte LDAP existe, ainsi qu'une entrée en base pour ce
+                   compte. L'entrée en base ne correspond pas au compte LDAP,
+                   et aucune correspondante n'est présente sur Partage.''' ,
+                'suppr. base' ) ,
             AS(  True , 22 , 'LDAP+ BSS+ / DB-' , '#f2ffba' ,
-				'''Un compte LDAP existe et est présent sur Partage avec les
+                '''Un compte LDAP existe et est présent sur Partage avec les
                    mêmes données; en revanche, aucune entrée n'existe en
                    base.''' ,
-				'ajout base' ) ,
+                'ajout base' ) ,
             AS(  True , 23 , 'LDAP- BSS~ / DB-' , '#f2ffba' ,
                 '''Un compte correspondant aux critères de présuppression est
                    présent sur Partage mais n'existe ni dans la base, ni dans le
                    LDAP.''' ,
-				'ajout base' ) ,
+                'ajout base' ) ,
             AS(  True , 24 , 'LDAP- DB~ / BSS~' , '#f2ffba' ,
                 '''Un compte présupprimé, présent à la fois sur le serveur
                    Partage et en base de données, a des données
                    discordantes.''' ,
-				'm.a.j. base' ) ,
+                'm.a.j. base' ) ,
             AS(  True , 25 , 'LDAP- BSS- / DB*' , '#f2ffba' ,
                 '''Un compte n'est présent que dans la base de données; rien n'y
                    correspond dans le LDAP ou sur Partage.''' ,
-				'suppr. base' ) ,
+                'suppr. base' ) ,
             # États erronés sans correction auto
             AS(  True , 30 , 'LDAP+ / DB- / BSS+' , '#ffbaba' ,
                 '''Un compte existe dans le LDAP avec certaines données, et sur
