@@ -352,12 +352,31 @@ class Consolidator( ProcessSkeleton ):
         :return: un dictionnaire associant à chaque EPPN présent sur le \
                 serveur Partage un enregistrement SyncAccount le décrivant
         """
+        import requests.packages.urllib3.exceptions as rpue
+        import requests.exceptions as re
+        import xml.etree.ElementTree as et
+        import urllib.error as ue
+        import http.client as hc
+        from time import sleep
+
         failed = False
         accounts = {}
 
         for mail in self.list_bss_accounts( ):
             # Lecture
-            qr = BSSAction( BSSQuery( 'getAccount' ) , mail )
+            account_attempts = 0
+            qr = None
+            while qr is None and account_attempts < 10:
+                try:
+                    qr = BSSAction( BSSQuery( 'getAccount' ) , mail )
+                except ( rpue.HTTPError , re.HTTPError , re.ConnectionError ,
+                         et.ParseError , ue.HTTPError , hc.HTTPException ) as e:
+                    account_attempts += 1
+                    Logging( 'bss' ).warning(
+                            'Erreur lors de la lecture du compte {}: {} '
+                            '(tentative {})'.format(
+                                mail , e , account_attempts ) )
+                    sleep( 30 )
             if not qr:
                 Logging( 'bss' ).error(
                         'Échec de la lecture du compte {}'.format( mail ) )
