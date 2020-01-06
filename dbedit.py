@@ -52,7 +52,8 @@ class DbEditor( ProcessSkeleton ):
 
         eppn = self.arguments.eppn
         eppn_domain = self.cfg.get( 'ldap' , 'eppn-domain' )
-        self.target = e if '@' in eppn else '{}@{}'.format( eppn , eppn_domain )
+        self.target = eppn if '@' in eppn else '{}@{}'.format( eppn ,
+                                                               eppn_domain )
 
         f = self.arguments.field
         if f not in SyncAccount.STORAGE:
