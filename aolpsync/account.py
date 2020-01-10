@@ -452,6 +452,8 @@ class SyncAccount:
             if v is not None:
                 mapped_from = SyncAccount.BSS[ bss_attr ]
                 if mapped_from not in SyncAccount.CREATE_ONLY:
+                    if mapped_from in SyncAccount.DETAILS and type( v ) == int:
+                        v = str( v )
                     setattr( self , mapped_from , v )
         # Aliases
         aliases = account.zimbraMailAlias
