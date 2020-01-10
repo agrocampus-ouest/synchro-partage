@@ -352,7 +352,7 @@ class Consolidator( ProcessSkeleton ):
         :return: un dictionnaire associant à chaque EPPN présent sur le \
                 serveur Partage un enregistrement SyncAccount le décrivant
         """
-        import lib_Partage_BSS.exceptions.BSSConnexionException as bsse
+        import lib_Partage_BSS.exceptions as bsse
         import requests.packages.urllib3.exceptions as rpue
         import requests.exceptions as re
         import xml.etree.ElementTree as et
