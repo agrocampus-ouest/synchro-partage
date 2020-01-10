@@ -38,6 +38,7 @@ class DiffItem:
         """
         self.eppn = eppn
         self.field = field
+        self.bss_equals = None
         self.values_ = {
             'ldap': DiffItem.Unknown ,
             'db': DiffItem.Unknown ,
@@ -111,7 +112,7 @@ class DiffItem:
             if v is None:
                 return 'Non renseigné'
             if isinstance( v , str ):
-                return v
+                return '«{}»'.format( v )
             if v == DiffItem.NoAccount:
                 return 'Compte absent'
             return 'N/A'
@@ -119,7 +120,7 @@ class DiffItem:
         if line >= len( v ):
             return ''
         v = tuple( v )
-        return v[ line ]
+        return '{:02d}. «{}»'.format( line + 1 , v[ line ] )
 
     def get_lines_( self ):
         """
@@ -197,6 +198,8 @@ class DiffItem:
 
         for line in range( 0 , n_lines ):
             f = self.field if line == 0 else ''
+            if self.bss_equals is not None:
+                f += ' (=)' if self.bss_equals else ' (≠)'
             data = [ f ] + [ self.get_text( s , line )
                                     for s in ( 'ldap' , 'db' , 'bss' ) ]
             sl = []
@@ -353,6 +356,12 @@ class DiffViewer( ProcessSkeleton ):
         if field in SyncAccount.BSS.values( ) or field in (
                     'mail' , 'aliases' , 'markedForDeletion' , 'cos' ):
             self.di_set_source( di , 'bss' )
+        if ( field in SyncAccount.DETAILS and eppn in self.bss_accounts
+                and eppn in self.db_accounts ):
+            from aolpsync.utils import multivalued_check_equals as mce
+            va = getattr( self.db_accounts[ eppn ] , field , None )
+            vb = getattr( self.bss_accounts[ eppn ] , field , None )
+            di.bss_equals = mce( va , vb )
         return di
 
     def compute_diff( self , eppn ):
@@ -362,8 +371,28 @@ class DiffViewer( ProcessSkeleton ):
         :param str eppn: l'EPPN de l'utilisateur
         :return: la liste des DiffItem pour chaque champ
         """
-        return [ self.init_diff_item( eppn , fld )
-                        for fld in self.fields ]
+        if eppn in self.bss_accounts and eppn in self.db_accounts:
+            ad = self.db_accounts[ eppn ]
+            ab = self.bss_accounts[ eppn ]
+            bss_equals = ad.bss_equals( ab )
+            if bss_equals:
+                bsse_extra = ''
+            else:
+                from aolpsync.utils import multivalued_check_equals as mce
+                mail_ok = mce( ad.mail , ab.mail )
+                mfd_ok = ad.markedForDeletion == ab.markedForDeletion
+                details_ok = not ad.details_differ( ab )
+                aliases_ok = mce( ad.aliases , ab.aliases )
+                bsse_extra = ( ' - mail: {} / mFD: {} / '
+                               'details: {} / alias: {}' ).format(
+                        *( ( 'OK' if e else 'KO' ) for e in (
+                                mail_ok , mfd_ok , details_ok , aliases_ok ) ) )
+        else:
+            bss_equals = None
+            bsse_extra = ''
+        return ( bss_equals , bsse_extra ,
+                [ self.init_diff_item( eppn , fld )
+                        for fld in self.fields ] )
 
     def process( self ):
         diffs = []
@@ -387,8 +416,13 @@ class DiffViewer( ProcessSkeleton ):
             return ( wf , *ws )
 
         # Génération des entrées de différences
+        eq_check = {}
+        ec_extra = {}
         for eppn in self.check_accounts:
-            diffs.extend( self.compute_diff( eppn ) )
+            bss_equals , extra , acc_diffs = self.compute_diff( eppn )
+            diffs.extend( acc_diffs )
+            eq_check[ eppn ] = bss_equals
+            ec_extra[ eppn ] = extra
         widths = find_max_widths_( )
         total_width = 13 + sum( widths )
 
@@ -413,10 +447,18 @@ class DiffViewer( ProcessSkeleton ):
             if prev_eppn != di.eppn:
                 if prev_eppn is not None:
                     print( sep1 )
+                if eq_check[ di.eppn ] is None:
+                    ec = 'N/A'
+                elif eq_check[ di.eppn ]:
+                    ec = 'OK'
+                else:
+                    ec = 'KO'
+                ttl_str = '{} (bss_equals: {}{})'.format( di.eppn , ec ,
+                        ec_extra[ di.eppn ] )
                 print( )
                 print( sep0 )
                 print( ( ( '| EPPN {: <' + str( total_width - 9 )
-                            + '} |' ).format( di.eppn ) ) )
+                            + '} |' ).format( ttl_str ) ) )
                 print( sep1 )
                 prev_eppn = di.eppn
             else:
