@@ -97,7 +97,7 @@ eppn-domain=agrocampus-ouest.fr
 # La liste des classes LDAP utilisées pour accéder aux enregistrements des
 # utilisateurs; ces classes doivent exister sur le serveur.
 # Si cette section n'existe pas, la classe posixGroup sera utilisée.
-#[ldap-groups-classes]
+#[ldap-group-classes]
 #	posixGroup
 
 
