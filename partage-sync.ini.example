@@ -93,12 +93,15 @@ eppn-domain=agrocampus-ouest.fr
 	supannPerson
 	eduPerson
 
-# Classes des enregistrements groupes
-# La liste des classes LDAP utilisées pour accéder aux enregistrements des
-# utilisateurs; ces classes doivent exister sur le serveur.
-# Si cette section n'existe pas, la classe posixGroup sera utilisée.
+# Configuration des classes et attributs à utiliser pour la lecture des groupes
+# LDAP. Chaque entrée dans la liste ci-dessous associe une ou plusieurs classes
+# LDAP (dont les noms sont séparés par des barres obliques) à un attribut dont
+# on s'attend à ce qu'il contiennne soit le login, soit le DN de l'utilisateur.
+# Si cette section n'existe pas, les défauts ci-dessous seront appliqués.
 #[ldap-group-classes]
-#	posixGroup
+#	posixGroup = memberUid
+#	groupOfNames = member
+#	groupOfUniqueNames = uniqueMember
 
 
 ################################################################################

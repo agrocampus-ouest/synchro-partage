@@ -641,18 +641,38 @@ class LDAPData:
                 :return: un dictionnaire associant à chaque groupe la liste \
                         des comptes qui en font partie
                 """
-                obj_group = get_def_( cfg.get_list(
-                        'ldap-group-classes' , ( 'posixGroup' , ) ) )
-                group_dn = cfg.get( 'ldap' , 'groups-dn' )
                 from ldap3 import Reader
-                reader = Reader( ldap_conn , obj_group , group_dn )
-                cursor = reader.search_paged( 10 , True )
+                group_types = cfg.get_section( 'ldap-group-classes' , {
+                        'posixGroup' : 'memberUid' ,
+                        'groupOfNames' : 'member' ,
+                        'groupOfUniqueNames' : 'uniqueMember' ,
+                    } )
                 groups = {}
-                for entry in cursor:
-                    groups[ entry.cn.value ] = set([ m.strip( )
-                            for m in entry.memberUid.values ])
-                    Logging( 'ldap' ).debug( 'Groupe {} chargé'.format(
-                            entry.cn.value ) )
+                group_dn = cfg.get( 'ldap' , 'groups-dn' )
+                for group_type , member_attr in group_types.items( ):
+                    # Chaque entrée correspond à une ou plusieurs classes
+                    # séparées par des /
+                    obj_classes = group_type.split( '/' )
+                    obj_group = get_def_( obj_classes )
+                    reader = Reader( ldap_conn , obj_group , group_dn )
+                    cursor = reader.search_paged( 10 , True )
+                    # On parcourt la liste
+                    for entry in cursor:
+                        group_name = entry.cn.value
+                        if group_name in groups:
+                            continue
+                        # On extrait les membres pour chaque nouveau groupe
+                        groups[ group_name ] = set( )
+                        for member in getattr( entry , member_attr ).values:
+                            member = member.strip( )
+                            # Transformation des DN en UID
+                            if '=' in member and ',' in member:
+                                parts_of_dn = member.split( ',' )
+                                attr_val = parts_of_dn[ 0 ].split( '=' )
+                                member = attr_val[ 1 ]
+                            groups[ group_name ].add( member )
+                        Logging( 'ldap' ).debug( 'Groupe {} chargé'.format(
+                                group_name ) )
                 return groups
 
             def set_account_groups_( all_uids ):
