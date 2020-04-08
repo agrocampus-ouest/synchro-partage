@@ -647,6 +647,8 @@ class LDAPData:
                         'groupOfNames' : 'member' ,
                         'groupOfUniqueNames' : 'uniqueMember' ,
                     } )
+                Logging( 'ldap' ).debug( 'Types de groupes : {}'.format(
+                    ' - '.join( group_types.keys( ) ) ) )
                 groups = {}
                 group_dn = cfg.get( 'ldap' , 'groups-dn' )
                 for group_type , member_attr in group_types.items( ):
