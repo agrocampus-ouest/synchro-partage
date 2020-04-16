@@ -648,7 +648,7 @@ class LDAPData:
                             'posixGroup' : 'memberUid' ,
                             'groupOfNames' : 'member' ,
                             'groupOfUniqueNames' : 'uniqueMember' ,
-                        } )
+                        }
                 Logging( 'ldap' ).debug( 'Types de groupes : {}'.format(
                     ' - '.join( group_types.keys( ) ) ) )
                 groups = {}
