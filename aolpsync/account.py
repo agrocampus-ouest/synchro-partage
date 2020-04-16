@@ -642,11 +642,13 @@ class LDAPData:
                         des comptes qui en font partie
                 """
                 from ldap3 import Reader
-                group_types = cfg.get_section( 'ldap-group-classes' , {
-                        'posixGroup' : 'memberUid' ,
-                        'groupOfNames' : 'member' ,
-                        'groupOfUniqueNames' : 'uniqueMember' ,
-                    } )
+                group_types = cfg.get_section( 'ldap-group-classes' , True )
+                if not group_types:
+                    group_types = {
+                            'posixGroup' : 'memberUid' ,
+                            'groupOfNames' : 'member' ,
+                            'groupOfUniqueNames' : 'uniqueMember' ,
+                        } )
                 Logging( 'ldap' ).debug( 'Types de groupes : {}'.format(
                     ' - '.join( group_types.keys( ) ) ) )
                 groups = {}
@@ -658,21 +660,26 @@ class LDAPData:
                     obj_group = get_def_( obj_classes )
                     reader = Reader( ldap_conn , obj_group , group_dn )
                     cursor = reader.search_paged( 10 , True )
+
                     # On parcourt la liste
                     for entry in cursor:
                         group_name = entry.cn.value
                         if group_name in groups:
                             continue
+
                         # On extrait les membres pour chaque nouveau groupe
                         groups[ group_name ] = set( )
                         for member in getattr( entry , member_attr ).values:
                             member = member.strip( )
+
                             # Transformation des DN en UID
                             if '=' in member and ',' in member:
                                 parts_of_dn = member.split( ',' )
                                 attr_val = parts_of_dn[ 0 ].split( '=' )
                                 member = attr_val[ 1 ]
+
                             groups[ group_name ].add( member )
+
                         Logging( 'ldap' ).debug( 'Groupe {} chargé'.format(
                                 group_name ) )
                 return groups
